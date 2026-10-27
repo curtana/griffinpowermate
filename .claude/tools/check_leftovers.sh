@@ -88,7 +88,7 @@ fi
 # ⑤ 서브에이전트가 남긴 백그라운드 명령의 고아 프로세스(hook_guard.py substop 기록 기준)
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ORPHAN_PY=""   # PYTHON(또는 예전 VENV_PY) env → 설정한 python → PATH의 python3·python 순
-for c in "${PYTHON:-}" "${VENV_PY:-}" "/c/Python314/python" "/c/Python314/python" python3 python; do
+for c in "${PYTHON:-}" "${VENV_PY:-}" "/g/workspace/PowerMate/.venv/Scripts/python.exe" "/c/Python314/python" python3 python; do
   [ -n "$c" ] && command -v "$c" >/dev/null 2>&1 && { ORPHAN_PY="$c"; break; }
 done
 if [ ! -f "$HERE/leftover_orphans.py" ]; then

@@ -13,6 +13,9 @@ All notable changes to this project are documented here. The format is based on
   (3 lines = one notch = wheel delta 120); fractional lines carry over. (`actions.py`)
 - `timing.rotate_sensitivity` and `timing.rotate_acceleration` now actually apply, at
   startup and when settings change. (`main.py`)
+- `requirements.txt` pinned `pycaw==20240413`, which does not exist on PyPI, so
+  `pip install -r requirements.txt` failed. Pinned to `pycaw==20251023`, the version
+  `audio.py` was adapted to in 1.1.0.
 
 ### Added
 - **Rotation acceleration curve.** With `rotate_acceleration` > 0, slow turns stay 1:1
