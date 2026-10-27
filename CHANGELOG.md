@@ -13,6 +13,11 @@ All notable changes to this project are documented here. The format is based on
   (3 lines = one notch = wheel delta 120); fractional lines carry over. (`actions.py`)
 - `timing.rotate_sensitivity` and `timing.rotate_acceleration` now actually apply, at
   startup and when settings change. (`main.py`)
+- `config.json`, `powermate.log` and the tray icon are found next to the app instead of
+  in the current directory, so **Start with Windows** (CWD = `System32`) no longer fails
+  to open the log; if the app folder isn't writable they fall back to
+  `%LOCALAPPDATA%\PowerMate`. `python main.py debug` now enables DEBUG logging.
+  (`paths.py`, `main.py`, `config.py`, `tray.py`)
 - `requirements.txt` pinned `pycaw==20240413`, which does not exist on PyPI, so
   `pip install -r requirements.txt` failed. Pinned to `pycaw==20251023`, the version
   `audio.py` was adapted to in 1.1.0.

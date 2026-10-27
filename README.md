@@ -291,6 +291,12 @@ Settings live in **`config.json`** next to the app (created on first run from de
 template is provided as `config.example.json`). It is human‑editable and **hot‑reloaded**
 within ~1 second of saving.
 
+"Next to the app" means the folder of `PowerMate.exe`, or the folder holding `main.py`
+when run from source — regardless of the current directory, so **Start with Windows**
+uses the same file. If that folder isn't writable (e.g. under `C:\Program Files`),
+`config.json` and `powermate.log` go to `%LOCALAPPDATA%\PowerMate` instead, and a
+warning is logged at startup.
+
 ```json
 {
   "timing": { "multi_click_ms": 250, "long_press_ms": 500,
@@ -377,6 +383,7 @@ audio.py         Native volume + mic control (pycaw), thread-safe across COM apa
 actions.py       Action executors (volume, media, scroll, keys, launch, run)
 app_monitor.py   Foreground process detection for per-app profiles
 config.py        Load/save/validate config.json with live file-watch reload
+paths.py         App / data / bundled-resource folders (independent of the CWD)
 tray.py          System tray icon + menu (pystray)
 ui/              CustomTkinter GUI (app_window, profile_view, action_editor,
                  led_panel, timing_panel)
@@ -459,6 +466,7 @@ Three test suites run **without** hardware:
 ```powershell
 python _test_gesture.py     # gesture state machine: all 8 triggers + regressions
 python _test_features.py    # macro action, startup module, debug panel, triple/long bindings
+python _test_paths.py       # config/log location, %LOCALAPPDATA% fallback, logging setup
 python _smoketest_gui.py    # builds the GUI, exercises profiles/panels/save, tears down
 ```
 
@@ -478,7 +486,8 @@ LED control all confirmed on a real PowerMate over WinUSB.
 **"PowerMate not found" (red status / tray)**
 - Confirm the **WinUSB** driver is installed via Zadig (this is the most common cause).
 - Replug the device; check the status bar in **Settings**.
-- Inspect `powermate.log` next to the app.
+- Inspect `powermate.log` next to the app (or in `%LOCALAPPDATA%\PowerMate` if the app
+  folder isn't writable — see [Configuration File](#configuration-file)).
 
 **Reads stop / LED works but knob does nothing**
 - Almost always a stale driver state — unplug and replug to power‑cycle the device.
@@ -515,6 +524,7 @@ powermate-app/
 ├── actions.py              # action executors
 ├── app_monitor.py          # active-app detection
 ├── config.py               # config load/save/watch
+├── paths.py                # app / data / resource folders
 ├── startup.py              # start-with-Windows (HKCU Run key)
 ├── tray.py                 # system tray
 ├── ui/
@@ -530,6 +540,7 @@ powermate-app/
 ├── install.bat             # convenience installer (deps + driver guidance)
 ├── _test_gesture.py        # gesture unit tests
 ├── _test_features.py       # macro / startup / debug-panel tests
+├── _test_paths.py          # config/log location + logging setup tests
 ├── _smoketest_gui.py       # GUI smoke test
 ├── README.md
 └── QUICKSTART.md
