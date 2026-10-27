@@ -28,6 +28,20 @@ All notable changes to this project are documented here. The format is based on
   failing, re-searching backs off (0 s, 1 s, 2 s, 4 s, then 5 s) instead of looping
   every 10 ms. (`device.py`, `main.py`)
 - Double/triple press with slightly longer clicks no longer splits into single presses: the multi‑click window is now measured from release, not press. (`gesture.py`)
+- **A bad setting no longer breaks the app.** Invalid or out-of-range values in
+  `config.json` (e.g. `"mode": "rainbow"`, `"fade_speed": 0`, flash on/off both `0`,
+  `"rotate_acceleration": null`, a non-numeric `amount`) are replaced by their defaults
+  in memory and logged as warnings; `config.json` itself is not rewritten. Before, these
+  stopped the app from starting or killed the LED thread. An error in one LED update is
+  now logged and the loop continues. (`config.py`, `led.py`, `main.py`, `gesture.py`)
+- **Save no longer fails silently on a bad field.** A non-numeric timing/LED entry is
+  skipped (its stored value kept), the other fields are saved, and the rejected fields
+  are listed in orange in the status bar. (`ui/timing_panel.py`, `ui/led_panel.py`,
+  `ui/app_window.py`)
+- **A shortcut like `1` sends the key 1.** The action editor converted every numeric
+  field to a number, so `keys: "1"` was saved as `1` — scan code 1, i.e. **Esc**. Only
+  `amount` is numeric now; keys, paths and commands stay text, and a non-numeric
+  amount falls back to the action's default. (`ui/action_editor.py`, `config.py`)
 
 ### Added
 - **Rotation acceleration curve.** With `rotate_acceleration` > 0, slow turns stay 1:1
