@@ -1,4 +1,5 @@
 """USB communication with Griffin PowerMate knob."""
+import errno
 import os
 import sys
 import usb.core
@@ -70,6 +71,23 @@ CMD_SET_PULSE_MODE = 0x04
 TIMEOUT_INTERRUPT_READ = 5000
 TIMEOUT_LED_WRITE = 2000
 
+LIBUSB_ERROR_TIMEOUT = -7
+_ETIMEDOUT = {110, getattr(errno, "ETIMEDOUT", 110)}  # Linux 110; Windows Python 10060
+
+
+def _is_timeout(e: "usb.core.USBError") -> bool:
+    """True if a USBError is a read timeout (normal: no input during the poll)."""
+    timeout_cls = getattr(usb.core, "USBTimeoutError", None)  # pyusb >= 1.2
+    if timeout_cls is not None and isinstance(e, timeout_cls):
+        return True
+    if getattr(e, "backend_error_code", None) == LIBUSB_ERROR_TIMEOUT:
+        return True
+    if getattr(e, "errno", None) in _ETIMEDOUT:
+        return True
+    # Message varies by backend ("Operation timed out", "timeout").
+    msg = str(e).lower()
+    return "timeout" in msg or "timed out" in msg
+
 
 class PowerMateDevice:
     """Handles USB communication with PowerMate device."""
@@ -98,7 +116,15 @@ class PowerMateDevice:
                 try:
                     usb.util.claim_interface(self.dev, 0)
                 except usb.core.USBError as e:
-                    logger.debug(f"claim_interface note: {e}")
+                    # Without the interface we cannot read; report "not found" so the
+                    # worker retries later (e.g. another process holds the device).
+                    logger.warning(f"Cannot claim PowerMate interface: {e}")
+                    try:
+                        usb.util.dispose_resources(self.dev)
+                    except Exception as e2:
+                        logger.debug(f"dispose_resources note: {e2}")
+                    self.dev = None
+                    return False
                 logger.info("PowerMate device found and opened")
                 return True
             except usb.core.USBError as e:
@@ -122,12 +148,24 @@ class PowerMateDevice:
         """
         Read interrupt events from the device.
         callback(button: int, knob_delta: int) - button: 1=pressed, 0=released; knob_delta: signed
+
+        A timeout (no input during the poll window) returns silently. Any other
+        USBError (device unplugged, pipe error, ...) is re-raised so the worker
+        closes the device and searches for it again.
         """
-        if not self.dev:
+        dev = self.dev
+        if not dev:
             return
 
         try:
-            data = self.dev.read(ENDPOINT_IN, 6, timeout=timeout_ms)
+            data = dev.read(ENDPOINT_IN, 6, timeout=timeout_ms)
+        except usb.core.USBError as e:
+            if _is_timeout(e):
+                return
+            logger.warning(f"USB read error: {e}")
+            raise
+
+        try:
             if len(data) >= 2:
                 button = int(data[0])
                 knob_delta = int(data[1])
@@ -135,14 +173,8 @@ class PowerMateDevice:
                 if knob_delta > 127:
                     knob_delta = knob_delta - 256
                 callback(button, knob_delta)
-        except usb.core.USBError as e:
-            # Timeouts are normal (no input during the poll window); ignore them.
-            # errno 110 == ETIMEDOUT; message varies by backend ("timeout"/"timed out").
-            msg = str(e).lower()
-            if getattr(e, "errno", None) != 110 and "tim" not in msg:
-                logger.debug(f"USB read error: {e}")
         except Exception as e:
-            logger.debug(f"Error reading events: {e}")
+            logger.debug(f"Error handling events: {e}")
 
     def set_brightness(self, brightness: float):
         """Set LED brightness 0.0-1.0.
@@ -152,25 +184,27 @@ class PowerMateDevice:
         for brightness permanently breaks the interrupt-IN read pipe
         ("Entity not found"), whereas the interrupt-OUT write does not disturb it.
         """
-        if not self.dev:
-            return
-
         brightness_byte = int(max(0, min(255, brightness * 255)))
 
+        # Check self.dev under the lock: the worker may close() the device at any
+        # time, and a failed LED write must never kill the LED thread.
         with self._lock:
-            try:
-                self.dev.write(ENDPOINT_OUT, bytes([brightness_byte]), timeout=TIMEOUT_LED_WRITE)
+            dev = self.dev
+            if not dev:
                 return
-            except usb.core.USBError as e:
+            try:
+                dev.write(ENDPOINT_OUT, bytes([brightness_byte]), timeout=TIMEOUT_LED_WRITE)
+                return
+            except Exception as e:
                 logger.debug(f"Interrupt LED write failed: {e}")
 
             # Fallback: vendor control transfer. Only on non-Windows, because on
             # WinUSB it breaks subsequent interrupt reads.
             if not sys.platform.startswith("win"):
                 try:
-                    self.dev.ctrl_transfer(0x41, CMD_SET_STATIC_BRIGHTNESS,
-                                           0x0001, brightness_byte, 0, TIMEOUT_LED_WRITE)
-                except usb.core.USBError as e:
+                    dev.ctrl_transfer(0x41, CMD_SET_STATIC_BRIGHTNESS,
+                                      0x0001, brightness_byte, 0, TIMEOUT_LED_WRITE)
+                except Exception as e:
                     logger.debug(f"Control LED write failed: {e}")
 
     def set_pulse_awake(self, enabled: bool):
@@ -180,12 +214,15 @@ class PowerMateDevice:
         on Windows/WinUSB, so it is disabled there (LED pulse is done in software
         via set_brightness instead — see led.py).
         """
-        if not self.dev or sys.platform.startswith("win"):
+        if sys.platform.startswith("win"):
             return
 
         with self._lock:
+            dev = self.dev
+            if not dev:
+                return
             try:
-                self.dev.ctrl_transfer(
+                dev.ctrl_transfer(
                     bmRequestType=0x41,
                     bRequest=CMD_SET_PULSE_AWAKE,
                     wValue=0x0003,
@@ -193,7 +230,7 @@ class PowerMateDevice:
                     data_or_wLength=0,
                     timeout=TIMEOUT_LED_WRITE
                 )
-            except usb.core.USBError as e:
+            except Exception as e:
                 logger.debug(f"Set pulse awake failed: {e}")
 
     def set_pulse_mode(self, pulse_table: int, pulse_speed: int):
@@ -206,7 +243,7 @@ class PowerMateDevice:
 
         Disabled on Windows/WinUSB (control transfers break interrupt reads).
         """
-        if not self.dev or sys.platform.startswith("win"):
+        if sys.platform.startswith("win"):
             return
 
         # Encode operation and argument
@@ -221,8 +258,11 @@ class PowerMateDevice:
             arg = pulse_speed - 255
 
         with self._lock:
+            dev = self.dev
+            if not dev:
+                return
             try:
-                self.dev.ctrl_transfer(
+                dev.ctrl_transfer(
                     bmRequestType=0x41,
                     bRequest=CMD_SET_PULSE_MODE,
                     wValue=(pulse_table << 8) | 0x04,
@@ -230,5 +270,5 @@ class PowerMateDevice:
                     data_or_wLength=0,
                     timeout=TIMEOUT_LED_WRITE
                 )
-            except usb.core.USBError as e:
+            except Exception as e:
                 logger.debug(f"Set pulse mode failed: {e}")
