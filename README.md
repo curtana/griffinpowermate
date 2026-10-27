@@ -211,15 +211,16 @@ the `osd` block of `config.json` and apply live.
 |---|---|
 | `rotate_right` | Turn clockwise |
 | `rotate_left` | Turn counter‑clockwise |
-| `press` | One click (fires after the multi‑click window elapses) |
+| `press` | One click (fires once the multi‑click window after release elapses) |
 | `double_press` | Two quick clicks |
 | `triple_press` | Three quick clicks |
 | `long_press` | Hold the button past the long‑press threshold (default 500 ms) |
 | `press_rotate_right` | Hold the button **and** turn clockwise |
 | `press_rotate_left` | Hold the button **and** turn counter‑clockwise |
 
-A single press intentionally waits for the multi‑click window (default 250 ms) so it can be
-distinguished from a double/triple press. Press‑while‑rotating suppresses the click so it
+A single press intentionally waits for the multi‑click window (default 250 ms) after release so
+it can be distinguished from a double/triple press; the gap between clicks is also measured
+from release, so holding a click a little longer doesn't break a double/triple press. Press‑while‑rotating suppresses the click so it
 doesn't also register as a press.
 
 ---

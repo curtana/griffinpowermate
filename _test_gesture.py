@@ -183,6 +183,75 @@ def test_config_change_applies_live():
     assert total(ev) - n > 1, ev[-1]
 
 
+# --- Multi-click window measured from release (#7; time injected via now=...) ---
+
+def click(g, t, hold=0.2, gap=0.1):
+    """Press at t, release after `hold`, poll mid-hold and mid-gap; return next press time."""
+    g.on_button(True, now=t)
+    g.update(now=t + hold / 2)           # update while held must not fire anything
+    g.on_button(False, now=t + hold)
+    g.update(now=t + hold + gap * 0.8)   # still inside the gap
+    return t + hold + gap
+
+def test_slow_double_press_from_release():
+    # (1) 200ms hold + 100ms gap + short press: one DOUBLE_PRESS (default 250/500).
+    g, ev = make(multi=250, long=500)
+    t = click(g, 100.0)
+    g.on_button(True, now=t)
+    g.on_button(False, now=t + 0.05)
+    g.update(now=t + 0.05 + 0.2)         # within multi_click_ms of the release
+    assert ev == [], f"fired too early: {ev}"
+    g.update(now=t + 0.05 + 0.26)
+    assert ev == [(Trigger.DOUBLE_PRESS, 0)], ev
+
+def test_slow_triple_press_from_release():
+    # (2) the same 200ms-hold / 100ms-gap pattern three times: TRIPLE_PRESS.
+    g, ev = make(multi=250, long=500)
+    t = 100.0
+    for _ in range(3):
+        t = click(g, t)
+    last_release = t - 0.1
+    g.update(now=last_release + 0.26)
+    assert ev == [(Trigger.TRIPLE_PRESS, 0)], ev
+
+def test_long_hold_single_waits_after_release():
+    # (3) 400ms hold (< long 500): no PRESS until multi_click_ms after the release.
+    g, ev = make(multi=250, long=500)
+    g.on_button(True, now=100.0)
+    g.update(now=100.3)
+    g.on_button(False, now=100.4)
+    g.update(now=100.6)
+    assert ev == [], f"fired before release + multi_click_ms: {ev}"
+    g.update(now=100.66)
+    assert ev == [(Trigger.PRESS, 0)], ev
+
+def test_long_press_then_release_injected():
+    # Release right after long_press fired: no extra PRESS once the window passes.
+    g, ev = make(multi=250, long=500)
+    g.on_button(True, now=100.0)
+    g.update(now=100.5)
+    assert ev == [(Trigger.LONG_PRESS, 0)], ev
+    g.on_button(False, now=100.51)
+    g.update(now=100.51 + 0.3)
+    assert ev == [(Trigger.LONG_PRESS, 0)], f"spurious event after long press: {ev}"
+
+def test_press_rotate_then_release_injected():
+    # Release right after press+rotate: no PRESS once the window passes.
+    g, ev = make(multi=250, long=500)
+    g.on_button(True, now=100.0)
+    g.on_knob(1, now=100.05)
+    g.on_button(False, now=100.06)
+    g.update(now=100.06 + 0.3)
+    assert ev == [(Trigger.PRESS_ROTATE_RIGHT, 1)], f"spurious press: {ev}"
+
+def test_update_before_any_press():
+    # Initial button_release_time must not trigger anything without a click.
+    g, ev = make(multi=250, long=500)
+    g.update(now=0.0)
+    g.update(now=100.0)
+    assert ev == [], ev
+
+
 for n, f in list(globals().items()):
     if n.startswith("test_") and callable(f):
         run(n, f)

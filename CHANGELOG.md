@@ -16,6 +16,7 @@ All notable changes to this project are documented here. The format is based on
 - `requirements.txt` pinned `pycaw==20240413`, which does not exist on PyPI, so
   `pip install -r requirements.txt` failed. Pinned to `pycaw==20251023`, the version
   `audio.py` was adapted to in 1.1.0.
+- Double/triple press with slightly longer clicks no longer splits into single presses: the multi‑click window is now measured from release, not press. (`gesture.py`)
 
 ### Added
 - **Rotation acceleration curve.** With `rotate_acceleration` > 0, slow turns stay 1:1
