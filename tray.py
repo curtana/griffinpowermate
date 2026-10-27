@@ -1,20 +1,13 @@
 """System tray icon management."""
 import os
-import sys
 import threading
 from typing import Callable, Optional
 from pystray import Icon, Menu, MenuItem
 from PIL import Image
 import logging
+from paths import resource_path
 
 logger = logging.getLogger(__name__)
-
-
-def resource_path(rel: str) -> str:
-    """Resolve a bundled resource path, working both from source and inside a
-    PyInstaller one-file bundle (which extracts data to sys._MEIPASS)."""
-    base = getattr(sys, "_MEIPASS", os.path.abspath("."))
-    return os.path.join(base, rel)
 
 
 class TrayIcon:
