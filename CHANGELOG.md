@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-10-27
+
 ### Fixed
 - **Knob scrolling is immediate and stops when you stop.** Scrolling now injects the
   wheel event directly (`user32.mouse_event`) instead of `pyautogui.scroll`, which sent
@@ -31,7 +33,8 @@ All notable changes to this project are documented here. The format is based on
 - **A bad setting no longer breaks the app.** Invalid or out-of-range values in
   `config.json` (e.g. `"mode": "rainbow"`, `"fade_speed": 0`, flash on/off both `0`,
   `"rotate_acceleration": null`, a non-numeric `amount`) are replaced by their defaults
-  in memory and logged as warnings; `config.json` itself is not rewritten. Before, these
+  in memory and logged as warnings; loading never rewrites `config.json` (the next save
+  from the settings window writes the replacements). Before, these
   stopped the app from starting or killed the LED thread. An error in one LED update is
   now logged and the loop continues. (`config.py`, `led.py`, `main.py`, `gesture.py`)
 - **Save no longer fails silently on a bad field.** A non-numeric timing/LED entry is
@@ -158,6 +161,8 @@ All notable changes to this project are documented here. The format is based on
   power cycle. Hardware pulse modes are therefore disabled on Windows; pulse/flash are
   done in software.
 
+[Unreleased]: https://github.com/curtana/griffinpowermate/compare/v1.3.0...develop
+[1.3.0]: https://github.com/curtana/griffinpowermate/releases/tag/v1.3.0
 [1.2.0]: https://github.com/accolytebyte/griffinpowermate/releases/tag/v1.2.0
 [1.1.1]: https://github.com/accolytebyte/griffinpowermate/releases/tag/v1.1.1
 [1.1.0]: https://github.com/accolytebyte/griffinpowermate/releases/tag/v1.1.0

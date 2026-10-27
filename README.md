@@ -567,6 +567,11 @@ powermate-app/
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full version history. Highlights:
 
+- **1.3.0** — immediate knob scrolling (direct wheel events, no 0.1 s pause), working
+  rotation sensitivity and an optional acceleration curve, reconnect after unplug,
+  config/log next to the app (Start with Windows), double/triple press timed from
+  release, and validated settings that fall back to defaults instead of breaking.
+- **1.2.0** — translucent on-screen display (OSD) overlay.
 - **1.1.1** — security/memory hardening (config deepcopy, reload-spam fix, debug-panel
   idle optimization) and a documented vulnerability assessment.
 - **1.1.0** — audio control fix (pycaw API change), 3-step macros, knob-activity debug
