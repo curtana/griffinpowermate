@@ -235,8 +235,8 @@ doesn't also register as a press.
 | `media_play_pause` | — | Media play/pause key |
 | `media_next` | — | Next track |
 | `media_prev` | — | Previous track |
-| `scroll_up` | `amount` (lines) | Scroll up |
-| `scroll_down` | `amount` (lines) | Scroll down |
+| `scroll_up` | `amount` (lines; 3 = one wheel notch) | Scroll up |
+| `scroll_down` | `amount` (lines; 3 = one wheel notch) | Scroll down |
 | `key` | `keys` (e.g. `"ctrl+z"`) | Send a keyboard shortcut |
 | `macro` | `sequence` (list, up to 3) | Send several key combos in order, e.g. `["ctrl+c","alt+tab","ctrl+v"]` |
 | `launch` | `path` | Open a file, app, or URL |
@@ -329,10 +329,17 @@ within ~1 second of saving.
 | `multi_click_ms` | 250 | Window to detect double/triple clicks; a single press fires after this |
 | `long_press_ms` | 500 | Hold time required to trigger `long_press` |
 | `rotate_sensitivity` | 1.0 | Multiplier applied to each rotation delta before accumulation |
-| `rotate_acceleration` | 0.0 | Reserved for future acceleration curves |
+| `rotate_acceleration` | 0.0 | 0.0–1.0. 0 = off. Higher values multiply fast turns (up to 1 + 9×value) while slow turns stay 1:1 |
 
 Lower `multi_click_ms` for snappier single presses (at the cost of harder double/triple
 detection); raise `rotate_sensitivity` to make a small turn do more.
+
+With `rotate_acceleration` above 0, turning slowly (≈4 detents/s or less) keeps the
+precise 1:1 step, and the step grows smoothly as you spin faster (full boost at ≈40
+detents/s). Pausing for more than 0.3 s drops back to precise mode.
+
+Scroll `amount` is in **lines**: Windows scrolls 3 lines per wheel notch, so the
+default `amount: 3` sends one notch per knob step.
 
 ---
 

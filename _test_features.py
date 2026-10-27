@@ -32,6 +32,74 @@ def test_macro_action_executor():
     assert hasattr(ex, "_macro")
 
 
+def _scroll_executor():
+    """ActionExecutor with user32.mouse_event replaced by a recorder.
+    If audio/keyboard deps aren't installed, they are stubbed only for this import."""
+    import types
+    stubbed = []
+    try:
+        import actions
+    except ImportError:
+        for name in ("audio", "keyboard"):
+            try:
+                __import__(name)
+            except ImportError:
+                mod = types.ModuleType(name)
+                mod.AudioController = object
+                sys.modules[name] = mod; stubbed.append(name)
+        sys.modules.pop("actions", None)
+        import actions
+        for name in stubbed:
+            del sys.modules[name]
+        sys.modules.pop("actions", None)  # don't leak the stub-bound module
+        print("    (stubbed for import:", stubbed, ")")
+    calls = []
+    actions._mouse_event = lambda flags, dx, dy, data, extra: calls.append((flags, data))
+    return actions, actions.ActionExecutor(audio=None), calls
+
+
+def test_scroll_amount3_is_one_notch():
+    actions, ex, calls = _scroll_executor()
+    ex.execute({"action": "scroll_down", "amount": 3}, 1)
+    assert calls == [(actions.MOUSEEVENTF_WHEEL, -120)], calls
+    calls.clear()
+    ex.execute({"action": "scroll_up", "amount": 3}, 2)   # 2 detents -> 2 notches
+    assert calls == [(actions.MOUSEEVENTF_WHEEL, 240)], calls
+
+
+def test_scroll_lines_and_fraction_carry():
+    actions, ex, calls = _scroll_executor()
+    for _ in range(3):
+        ex.execute({"action": "scroll_down", "amount": 1}, 1)
+    assert calls == [(actions.MOUSEEVENTF_WHEEL, -40)] * 3, calls
+    # 0.01 line = 0.4 delta: nothing sent until the carry reaches a whole unit.
+    calls.clear()
+    for _ in range(10):
+        ex.execute({"action": "scroll_down", "amount": 0.01}, 1)
+    assert sum(d for _, d in calls) == -4 and all(d == -1 for _, d in calls), calls
+    # 0.5 line = 20 delta exactly; total over 6 calls is one notch.
+    calls.clear()
+    for _ in range(6):
+        ex.execute({"action": "scroll_down", "amount": 0.5}, 1)
+    assert sum(d for _, d in calls) == -120, calls
+    # Direction change: leftover stays within half a unit, signs follow direction.
+    calls.clear()
+    ex.execute({"action": "scroll_down", "amount": 0.0125}, 1)   # -0.5 -> carried
+    ex.execute({"action": "scroll_up", "amount": 3}, 1)
+    assert calls and all(d > 0 for _, d in calls) and abs(ex._scroll_remainder) <= 0.5,         (calls, ex._scroll_remainder)
+    assert sum(d for _, d in calls) in (119, 120), calls
+
+
+def test_scroll_has_no_pause():
+    actions, ex, calls = _scroll_executor()
+    t0 = time.perf_counter()
+    for _ in range(100):
+        ex.execute({"action": "scroll_down", "amount": 3}, 1)
+    elapsed = time.perf_counter() - t0
+    assert len(calls) == 100 and elapsed < 0.1, (len(calls), elapsed)
+    print(f"    100 scrolls in {elapsed*1000:.2f} ms")
+
+
 def test_macro_editor_roundtrip():
     import customtkinter as ctk
     from ui.action_editor import ActionEditor
