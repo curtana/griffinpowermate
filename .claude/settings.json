@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push *)",
+      "Bash(git merge *)",
+      "Bash(git pull *)",
+      "Bash(gh api *)",
+      "Bash(gh pr merge *)",
+      "Bash(git tag *)",
+      "Bash(gh release *)"
+    ],
+    "ask": [
+      "Bash(git push origin main*)",
+      "Bash(git push * main)",
+      "Bash(git push * HEAD:main*)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * --force*)",
+      "Bash(git push origin --delete*)"
+    ]
+  }
+}

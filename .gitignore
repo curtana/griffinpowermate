@@ -26,3 +26,9 @@ desktop.ini
 .vscode/
 .idea/
 *.swp
+
+# Team process (manager + subagents)
+_workspace/
+.claude/settings.local.json
+.claude/settings.local.json.bak-*
+.claude/tools/stop-*

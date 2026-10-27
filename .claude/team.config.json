@@ -1,0 +1,41 @@
+{
+  "project_name": "PowerMate",
+  "project_desc": "Griffin PowerMate USB 노브를 Windows 11에서 쓰는 Python 컨트롤러(제스처·앱별 프로필·LED·OSD)",
+  "language": "Python",
+  "user_shell": "PowerShell",
+  "manager_python": "/c/Python314/python",
+  "sub_python_posix": "",
+  "sub_python_win": "",
+  "test_cmd": "python _test_gesture.py && python _test_features.py && python _smoketest_gui.py 2>&1 | tail -n 30",
+  "test_one_cmd": "python _test_<대상>.py",
+  "main_branch": "main",
+  "integration_branch": "develop",
+  "feature_prefix": "feature/",
+  "critical_paths": "USB 계층(device.py), 제스처 상태 머신(gesture.py), 동작 실행(actions.py), 스레드 조율(main.py)",
+  "out_dir": "_workspace",
+  "tmp_root_win": "G:\\tmp\\PowerMate",
+  "tmp_root_posix": "/g/tmp/PowerMate",
+  "tasks_root_posix": "/c/Users/curta/AppData/Local/Temp/claude/G--workspace-PowerMate",
+  "process_filter": "PowerMate|[\\\\/]wt-|/g/tmp/PowerMate",
+  "process_exclude": "",
+  "disk_letter": "G:",
+  "worktree_prefix": "wt-",
+
+  "golden": false,
+  "workspace_only_roles": null,
+
+  "standards": false,
+  "holdout": false,
+  "analyst": false,
+  "watcher": false,
+
+  "release": "tag+build",
+  "tag_format": "v<X.Y.Z>",
+  "build_cmd": "pyinstaller --noconfirm --clean build.spec",
+  "build_artifact": "dist\\PowerMate.exe",
+  "suite_allow_min": 30,
+
+  "shared_permissions": true,
+  "auto_merge_pr": true,
+  "python_repl_deny": true
+}
