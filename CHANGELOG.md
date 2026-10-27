@@ -16,6 +16,10 @@ All notable changes to this project are documented here. The format is based on
 - `requirements.txt` pinned `pycaw==20240413`, which does not exist on PyPI, so
   `pip install -r requirements.txt` failed. Pinned to `pycaw==20251023`, the version
   `audio.py` was adapted to in 1.1.0.
+- **Unplugging and re-plugging the knob reconnects without restarting the app.** Read
+  errors other than timeouts now reach the worker (close → search again), a failed
+  `claim_interface` no longer reports "connected", and LED writes racing a disconnect
+  no longer kill the LED thread. (`device.py`)
 
 ### Added
 - **Rotation acceleration curve.** With `rotate_acceleration` > 0, slow turns stay 1:1
