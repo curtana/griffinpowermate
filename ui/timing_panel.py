@@ -1,6 +1,8 @@
 """Timing configuration panel."""
+from typing import List
+
 import customtkinter as ctk
-from config import Config
+from config import Config, to_number
 
 
 class TimingPanel(ctk.CTkFrame):
@@ -82,9 +84,28 @@ class TimingPanel(ctk.CTkFrame):
         self.widgets["rotate_sensitivity"].set(self.config.get("timing.rotate_sensitivity", 1.0))
         self.widgets["rotate_acceleration"].set(self.config.get("timing.rotate_acceleration", 0.0))
 
-    def save(self):
-        """Save timing settings to config."""
-        self.config.set("timing.multi_click_ms", int(self.widgets["multi_click_ms"].get()))
-        self.config.set("timing.long_press_ms", int(self.widgets["long_press_ms"].get()))
-        self.config.set("timing.rotate_sensitivity", float(self.widgets["rotate_sensitivity"].get()))
-        self.config.set("timing.rotate_acceleration", float(self.widgets["rotate_acceleration"].get()))
+    def save(self) -> List[str]:
+        """Save timing settings to config.
+
+        Returns the fields whose input was not used: not a number (the stored
+        value is kept) or out of range (Config substitutes the default)."""
+        return save_fields(self.config, "timing", self.widgets,
+                           ("multi_click_ms", "long_press_ms",
+                            "rotate_sensitivity", "rotate_acceleration"))
+
+
+def save_fields(config: Config, section: str, widgets, keys) -> List[str]:
+    """Write each widget's value to `<section>.<key>`; return the keys whose
+    input was rejected. Non-numeric text is skipped (stored value kept);
+    numbers go through Config.set's validation."""
+    rejected = []
+    for key in keys:
+        value = widgets[key].get()
+        if isinstance(value, str):
+            value = to_number(value)
+            if value is None:
+                rejected.append(key)
+                continue
+        if not config.set(f"{section}.{key}", value):
+            rejected.append(key)
+    return rejected

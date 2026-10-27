@@ -281,18 +281,27 @@ class AppWindow:
 
     def _save(self):
         # Persist LED + timing into the in-memory config, then the current
-        # profile's bindings, then flush to disk once.
+        # profile's bindings, then flush to disk once. Fields with invalid
+        # input are skipped/defaulted (the rest is still saved) and listed in
+        # the status line.
+        rejected = []
         if self.led_panel:
-            self.led_panel.save()
+            rejected += [f"led.{k}" for k in self.led_panel.save()]
         if self.timing_panel:
-            self.timing_panel.save()
+            rejected += [f"timing.{k}" for k in self.timing_panel.save()]
         if self.osd_panel:
             self.osd_panel.save()
         if self.profile_view:
             self.profile_view.save()
+            for trigger, editor in self.profile_view.action_editors.items():
+                rejected += [f"{trigger}.{p}" for p in editor.invalid_params]
         self.config.save()
-        self.set_status("Saved", "green")
         self.on_config_change()
+        # After on_config_change, which may post its own status.
+        if rejected:
+            self.set_status("Saved; invalid input ignored: " + ", ".join(rejected), "orange")
+        else:
+            self.set_status("Saved", "green")
 
     def _reload(self):
         self.config.reload()

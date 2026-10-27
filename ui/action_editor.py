@@ -1,7 +1,12 @@
 """Action editor widget for configuring trigger actions."""
+import logging
 import customtkinter as ctk
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 import tkinter as tk
+
+from config import DEFAULT_ACTION_AMOUNTS, to_number
+
+logger = logging.getLogger(__name__)
 
 
 class ActionEditor(ctk.CTkFrame):
@@ -33,6 +38,7 @@ class ActionEditor(ctk.CTkFrame):
         self.action_dropdown: Optional[ctk.CTkComboBox] = None
         self.param_frame: Optional[ctk.CTkFrame] = None
         self.param_widgets: Dict[str, Any] = {}
+        self.invalid_params: List[str] = []   # set by get_action()
 
     def create(self):
         """Create the action editor widget."""
@@ -190,7 +196,13 @@ class ActionEditor(ctk.CTkFrame):
                             widget.insert(0, str(value))
 
     def get_action(self) -> Dict[str, Any]:
-        """Get current action configuration."""
+        """Get current action configuration.
+
+        Only `amount` is converted to a number; keys / path / command / macro
+        steps stay text (so a shortcut "1" is the key 1, not scan code 1).
+        An amount that isn't a number becomes the action's default amount and
+        its name is left in self.invalid_params for the Save status line."""
+        self.invalid_params = []
         if not self.current_action or self.current_action == "none":
             return {"action": "none"}
 
@@ -210,10 +222,15 @@ class ActionEditor(ctk.CTkFrame):
         for param_name, widget in self.param_widgets.items():
             if isinstance(widget, ctk.CTkEntry):
                 value = widget.get()
-                try:
-                    # Try to parse as number
-                    config[param_name] = float(value) if "." in value else int(value)
-                except ValueError:
+                if param_name == "amount":
+                    number = to_number(value)
+                    if number is None:
+                        number = DEFAULT_ACTION_AMOUNTS.get(self.current_action, 1)
+                        logger.warning(f"{self.trigger_name}: amount {value!r} is not a "
+                                       f"number, using {number}")
+                        self.invalid_params.append(param_name)
+                    config[param_name] = number
+                else:
                     config[param_name] = value
 
         return config

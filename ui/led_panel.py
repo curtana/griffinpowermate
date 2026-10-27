@@ -1,7 +1,8 @@
 """LED configuration panel."""
 import customtkinter as ctk
-from typing import Optional
+from typing import List, Optional
 from config import Config
+from .timing_panel import save_fields
 
 
 class LEDPanel(ctk.CTkFrame):
@@ -122,13 +123,17 @@ class LEDPanel(ctk.CTkFrame):
         self.widgets["fade_delay"].delete(0, "end")
         self.widgets["fade_delay"].insert(0, str(self.config.get("led.fade_delay", 1.0)))
 
-    def save(self):
-        """Save LED settings to config."""
-        self.config.set("led.mode", self.widgets["mode"].get())
-        self.config.set("led.brightness", self.widgets["brightness"].get())
-        self.config.set("led.pulse_speed", int(float(self.widgets["pulse_speed"].get())))
-        self.config.set("led.pulse_table", int(self.widgets["pulse_table"].get()))
-        self.config.set("led.flash_on_ms", int(self.widgets["flash_on_ms"].get()))
-        self.config.set("led.flash_off_ms", int(self.widgets["flash_off_ms"].get()))
-        self.config.set("led.fade_speed", float(self.widgets["fade_speed"].get()))
-        self.config.set("led.fade_delay", float(self.widgets["fade_delay"].get()))
+    def save(self) -> List[str]:
+        """Save LED settings to config.
+
+        Returns the fields whose input was not used (see timing_panel.save_fields)."""
+        rejected = []
+        if not self.config.set("led.mode", self.widgets["mode"].get()):
+            rejected.append("mode")
+        rejected += save_fields(self.config, "led", self.widgets,
+                                ("brightness", "pulse_speed", "pulse_table",
+                                 "flash_on_ms", "flash_off_ms",
+                                 "fade_speed", "fade_delay"))
+        if not self.config.check_flash_pair():   # 0 + 0 ms -> both defaults
+            rejected += [k for k in ("flash_on_ms", "flash_off_ms") if k not in rejected]
+        return rejected

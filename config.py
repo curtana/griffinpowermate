@@ -2,6 +2,7 @@
 import copy
 import json
 import logging
+import math
 import threading
 import os
 from typing import Dict, Any, Optional
@@ -64,6 +65,196 @@ DEFAULT_CONFIG = {
 }
 
 
+# --- Validation ------------------------------------------------------------
+# A bad value is replaced by its default *in memory* and logged; validation
+# never rewrites the user's config.json. Numeric strings ("250") are accepted
+# and converted; bools are not numbers here.
+
+# Default `amount` per action (the same values actions.py falls back to).
+DEFAULT_ACTION_AMOUNTS = {
+    "volume_up": 0.04,
+    "volume_down": 0.04,
+    "scroll_up": 3,
+    "scroll_down": 3,
+}
+
+LED_MODES = ("off", "solid", "pulse", "flash", "volume")
+
+
+def to_number(value: Any):
+    """int/float or a numeric string as a finite int/float; None otherwise.
+
+    Strings parse as int when they can, else float. Bools are rejected."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        num = value
+    elif isinstance(value, str):
+        text = value.strip()
+        try:
+            num = int(text)
+        except ValueError:
+            try:
+                num = float(text)
+            except ValueError:
+                return None
+    else:
+        return None
+    if isinstance(num, float) and not math.isfinite(num):
+        return None
+    return num
+
+
+def _int_rule(lo: int, hi: Optional[int] = None):
+    def check(value):
+        num = to_number(value)
+        if num is None:
+            return None
+        num = int(round(num))
+        if num < lo or (hi is not None and num > hi):
+            return None
+        return num
+    return check
+
+
+def _float_rule(lo: float, hi: Optional[float] = None, lo_open: bool = False):
+    def check(value):
+        num = to_number(value)
+        if num is None:
+            return None
+        num = float(num)
+        if num < lo or (lo_open and num == lo) or (hi is not None and num > hi):
+            return None
+        return num
+    return check
+
+
+def _mode_rule(value):
+    return value if value in LED_MODES else None
+
+
+# Validated settings: path -> check(value) giving the cleaned value, or None
+# when invalid. Paths not listed here (osd.*, start_with_windows) pass as-is.
+_RULES = {
+    "timing.multi_click_ms": _int_rule(50, 2000),
+    "timing.long_press_ms": _int_rule(100, 5000),
+    "timing.rotate_sensitivity": _float_rule(0.0, 10.0, lo_open=True),
+    "timing.rotate_acceleration": _float_rule(0.0, 1.0),
+    "led.mode": _mode_rule,
+    "led.brightness": _float_rule(0.0, 1.0),
+    "led.pulse_speed": _int_rule(0, 510),
+    "led.pulse_table": _int_rule(0, 2),
+    "led.flash_on_ms": _int_rule(0),
+    "led.flash_off_ms": _int_rule(0),
+    "led.fade_speed": _float_rule(0.0, lo_open=True),
+    "led.fade_delay": _float_rule(0.0),
+}
+
+
+def _default_for(path: str) -> Any:
+    value = DEFAULT_CONFIG
+    for part in path.split("."):
+        value = value[part]
+    return copy.deepcopy(value)
+
+
+def _warn(path: str, value: Any, default: Any):
+    logger.warning(f"config: {path} = {value!r} invalid, using {default!r}")
+
+
+def _clean_value(path: str, value: Any):
+    """(cleaned value, ok) for a path in _RULES; ok=False means the default
+    was substituted."""
+    cleaned = _RULES[path](value)
+    if cleaned is None:
+        default = _default_for(path)
+        _warn(path, value, default)
+        return default, False
+    return cleaned, True
+
+
+def _clean_flash_pair(led: Dict[str, Any]) -> bool:
+    """flash_on_ms + flash_off_ms must be > 0, else both get their defaults.
+    Returns False when that happened."""
+    on, off = led.get("flash_on_ms"), led.get("flash_off_ms")
+    if not isinstance(on, int) or not isinstance(off, int) or on + off > 0:
+        return True  # a missing key falls back to its (non-zero) default
+    d_on, d_off = _default_for("led.flash_on_ms"), _default_for("led.flash_off_ms")
+    logger.warning(f"config: led.flash_on_ms + led.flash_off_ms = {on} + {off} invalid, "
+                   f"using {d_on} + {d_off}")
+    led["flash_on_ms"], led["flash_off_ms"] = d_on, d_off
+    return False
+
+
+def _clean_action(where: str, action: Any):
+    """Clean one trigger binding in place. Empty / 'none' / other bindings
+    (and the inheritance they mean) are left exactly as they are."""
+    if not isinstance(action, dict):
+        return
+    name = action.get("action")
+    if name in DEFAULT_ACTION_AMOUNTS and "amount" in action:
+        num = to_number(action["amount"])
+        if num is None:
+            default = DEFAULT_ACTION_AMOUNTS[name]
+            _warn(f"{where}.amount", action["amount"], default)
+            num = default
+        action["amount"] = num
+    elif name == "key" and "keys" in action:
+        keys = action["keys"]
+        if not isinstance(keys, str):
+            if to_number(keys) is not None:
+                action["keys"] = str(keys)    # 1 -> "1", not scan code 1 (Esc)
+            else:
+                _warn(f"{where}.keys", keys, "")
+                action["keys"] = ""
+    elif name == "macro" and "sequence" in action:
+        seq = action["sequence"]
+        if isinstance(seq, list):
+            cleaned = [step if isinstance(step, str) else str(step)
+                       for step in seq
+                       if isinstance(step, str) or to_number(step) is not None]
+        elif isinstance(seq, str):
+            cleaned = [seq]   # one combo, not one key per character
+        else:
+            cleaned = []
+        if not isinstance(seq, list) or len(cleaned) != len(seq):
+            _warn(f"{where}.sequence", seq, cleaned)
+        action["sequence"] = cleaned
+
+
+def sanitize(config: Any) -> Dict[str, Any]:
+    """Return a validated copy of a loaded config (rules above).
+
+    Missing keys stay missing (readers supply defaults); unknown keys are kept."""
+    if not isinstance(config, dict):
+        logger.warning(f"config: top level is {type(config).__name__}, not an object; "
+                       f"using defaults")
+        return copy.deepcopy(DEFAULT_CONFIG)
+    config = copy.deepcopy(config)
+    for section in ("timing", "led"):
+        if section not in config:
+            continue
+        values = config[section]
+        if not isinstance(values, dict):
+            default = _default_for(section)
+            _warn(section, values, default)
+            config[section] = default
+            continue
+        for key in list(values):
+            path = f"{section}.{key}"
+            if path in _RULES:
+                values[key], _ = _clean_value(path, values[key])
+    if isinstance(config.get("led"), dict):
+        _clean_flash_pair(config["led"])
+    profiles = config.get("profiles")
+    if isinstance(profiles, dict):
+        for pname, bindings in profiles.items():
+            if isinstance(bindings, dict):
+                for trigger, action in bindings.items():
+                    _clean_action(f"profiles.{pname}.{trigger}", action)
+    return config
+
+
 class Config:
     """Configuration loader and manager."""
 
@@ -88,7 +279,8 @@ class Config:
             if os.path.exists(self.config_file):
                 try:
                     with open(self.config_file, 'r') as f:
-                        self.config = json.load(f)
+                        # Validated copy in memory; the file stays as written.
+                        self.config = sanitize(json.load(f))
                     logger.info(f"Loaded config from {self.config_file}")
                     self._last_mtime = os.path.getmtime(self.config_file)
                 except Exception as e:
@@ -130,9 +322,17 @@ class Config:
                     return default
             return value
 
-    def set(self, path: str, value: Any):
-        """Set value by dot-separated path."""
+    def set(self, path: str, value: Any) -> bool:
+        """Set value by dot-separated path.
+
+        Validated settings (timing.*, led.*) go through the same rules as the
+        file: an invalid value is replaced by its default and logged. Returns
+        False when that happened, True otherwise. The flash on/off pair rule
+        spans two keys, so callers setting them run check_flash_pair() after."""
         with self._lock:
+            ok = True
+            if path in _RULES:
+                value, ok = _clean_value(path, value)
             parts = path.split(".")
             target = self.config
             for part in parts[:-1]:
@@ -140,6 +340,14 @@ class Config:
                     target[part] = {}
                 target = target[part]
             target[parts[-1]] = value
+            return ok
+
+    def check_flash_pair(self) -> bool:
+        """Apply the led.flash_on_ms + led.flash_off_ms > 0 rule (both get
+        defaults otherwise). Returns False when the defaults were applied."""
+        with self._lock:
+            led = self.config.get("led")
+            return _clean_flash_pair(led) if isinstance(led, dict) else True
 
     def get_profile(self, process_name: Optional[str]) -> Dict[str, Any]:
         """Get effective bindings for a process.

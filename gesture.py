@@ -129,8 +129,11 @@ class GestureDetector:
         inst = abs(delta) / max(dt, ACCEL_MIN_DT_S)
         self.rotate_speed = ACCEL_SMOOTHING * self.rotate_speed + (1 - ACCEL_SMOOTHING) * inst
 
-        a = min(self.config.rotate_acceleration, 1.0)
-        if a <= 0:
+        try:
+            a = min(float(self.config.rotate_acceleration), 1.0)
+        except (TypeError, ValueError):
+            a = 0.0  # missing/invalid setting (e.g. null): no acceleration
+        if not a > 0:   # also catches NaN
             return 1.0
         gmax = 1 + ACCEL_GAIN * a
         t = (self.rotate_speed - ACCEL_V0) / (ACCEL_VMAX - ACCEL_V0)

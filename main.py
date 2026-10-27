@@ -89,8 +89,11 @@ class PowerMateApp:
         self.config.on_change(self._on_config_change)
 
     def _setup_led_from_config(self):
-        """Setup LED controller from config."""
-        self.led.mode = LEDMode(self.config.get("led.mode", "volume"))
+        """Setup LED controller from config (values already validated by Config)."""
+        try:
+            self.led.mode = LEDMode(self.config.get("led.mode", "volume"))
+        except ValueError:   # defensive: Config replaces an unknown mode already
+            self.led.mode = LEDMode.VOLUME
         self.led.brightness = self.config.get("led.brightness", 1.0)
         self.led.pulse_speed = self.config.get("led.pulse_speed", 255)
         self.led.pulse_table = self.config.get("led.pulse_table", 0)

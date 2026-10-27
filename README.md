@@ -327,6 +327,18 @@ warning is logged at startup.
 }
 ```
 
+**Invalid values fall back to defaults.** A value that is the wrong type or out of
+range (e.g. `"multi_click_ms": 10`, `"mode": "rainbow"`, `"fade_speed": 0`, flash on
+and off both `0`, an `amount` that isn't a number) is replaced by its default and a
+`config: <setting> = <value> invalid, using <default>` warning goes to `powermate.log`.
+The replacement is in memory only — `config.json` is not rewritten. Numeric strings
+such as `"250"` are accepted, and a shortcut written as a number (`"keys": 1`) is read
+as the key `"1"`. Ranges: `multi_click_ms` 50–2000, `long_press_ms` 100–5000,
+`rotate_sensitivity` above 0 up to 10, `rotate_acceleration` 0–1, `brightness` 0–1,
+`pulse_speed` 0–510, `pulse_table` 0–2, `flash_on_ms`/`flash_off_ms` 0 or more (not
+both 0), `fade_speed` above 0, `fade_delay` 0 or more. In the settings window, **Save**
+stores every valid field and lists the rejected ones in orange in the status bar.
+
 ---
 
 ## Timing & Sensitivity
