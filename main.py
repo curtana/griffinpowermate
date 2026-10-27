@@ -41,7 +41,9 @@ class PowerMateApp:
         # Gesture detection
         gesture_config = GestureConfig(
             multi_click_ms=self.config.get("timing.multi_click_ms", 250),
-            long_press_ms=self.config.get("timing.long_press_ms", 500)
+            long_press_ms=self.config.get("timing.long_press_ms", 500),
+            rotate_sensitivity=self.config.get("timing.rotate_sensitivity", 1.0),
+            rotate_acceleration=self.config.get("timing.rotate_acceleration", 0.0)
         )
         self.gesture = GestureDetector(self._on_gesture, gesture_config)
 
@@ -211,9 +213,11 @@ class PowerMateApp:
         self._setup_led_from_config()
         self._apply_osd_from_config()
 
-        # Update gesture timings
+        # Update gesture timings + rotation feel (read per event by the worker thread)
         self.gesture.config.multi_click_ms = self.config.get("timing.multi_click_ms", 250)
         self.gesture.config.long_press_ms = self.config.get("timing.long_press_ms", 500)
+        self.gesture.config.rotate_sensitivity = self.config.get("timing.rotate_sensitivity", 1.0)
+        self.gesture.config.rotate_acceleration = self.config.get("timing.rotate_acceleration", 0.0)
 
         if self.app_window:
             self.app_window.set_status("Config reloaded", "green")

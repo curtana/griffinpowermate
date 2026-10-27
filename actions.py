@@ -3,12 +3,24 @@ import logging
 import subprocess
 import os
 import time
+import ctypes
 from typing import Callable, Any, Dict
 from audio import AudioController
-import pyautogui
 import keyboard
 
 logger = logging.getLogger(__name__)
+
+# Mouse wheel injection (user32.mouse_event). One wheel notch is WHEEL_DELTA (120);
+# Windows' default "lines per notch" is 3, so one scroll line is 40 delta units.
+MOUSEEVENTF_WHEEL = 0x0800
+WHEEL_DELTA = 120
+LINES_PER_NOTCH = 3
+DELTA_PER_LINE = WHEEL_DELTA / LINES_PER_NOTCH
+
+
+def _mouse_event(flags: int, dx: int, dy: int, data: int, extra: int):
+    """Thin wrapper over user32.mouse_event (tests replace this)."""
+    ctypes.windll.user32.mouse_event(flags, dx, dy, ctypes.c_ulong(data & 0xFFFFFFFF), extra)
 
 
 class ActionExecutor:
@@ -17,6 +29,8 @@ class ActionExecutor:
     def __init__(self, audio: AudioController, on_led_change: Callable = None):
         self.audio = audio
         self.on_led_change = on_led_change or (lambda: None)
+        # Signed fractional wheel delta not yet sent (carried to the next scroll).
+        self._scroll_remainder = 0.0
 
     def execute(self, action_config: Dict[str, Any], amount: int = 0):
         """
@@ -106,12 +120,18 @@ class ActionExecutor:
         except Exception as e:
             logger.debug(f"Error sending media key {key}: {e}")
 
-    def _scroll(self, amount: int, direction: str):
-        """Scroll up or down."""
-        # pyautogui.scroll() is positive for up, negative for down
-        scroll_amount = amount if direction == "up" else -amount
+    def _scroll(self, amount: float, direction: str):
+        """Scroll up or down by `amount` lines (3 lines = 1 wheel notch). No sleep."""
+        lines = amount if direction == "up" else -amount  # wheel: + up, - down
+        # Signed carry: rounding keeps |remainder| <= 0.5 delta units, so a direction
+        # change carries at most half a unit (1/240 notch) into the new direction.
+        total = lines * DELTA_PER_LINE + self._scroll_remainder
+        delta = int(round(total))
+        self._scroll_remainder = total - delta
+        if delta == 0:
+            return
         try:
-            pyautogui.scroll(scroll_amount)
+            _mouse_event(MOUSEEVENTF_WHEEL, 0, 0, delta, 0)
         except Exception as e:
             logger.debug(f"Error scrolling: {e}")
 

@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Knob scrolling is immediate and stops when you stop.** Scrolling now injects the
+  wheel event directly (`user32.mouse_event`) instead of `pyautogui.scroll`, which sent
+  1/40 of a notch and slept 0.1 s per call so turns piled up. `amount` is in lines
+  (3 lines = one notch = wheel delta 120); fractional lines carry over. (`actions.py`)
+- `timing.rotate_sensitivity` and `timing.rotate_acceleration` now actually apply, at
+  startup and when settings change. (`main.py`)
+
+### Added
+- **Rotation acceleration curve.** With `rotate_acceleration` > 0, slow turns stay 1:1
+  and fast turns are multiplied (up to 1 + 9×value); a pause over 0.3 s resets to
+  precise mode. Default 0.0 keeps the previous behaviour. (`gesture.py`)
+
+### Removed
+- `pyautogui` dependency.
+
 ## [1.2.0] — 2026-06-07
 
 ### Added

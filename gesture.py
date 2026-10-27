@@ -25,6 +25,15 @@ class GestureConfig:
     rotate_acceleration: float = 0.0 # Faster rotation gives more delta
 
 
+# Rotation acceleration curve (speed = knob detents per second). Starting values.
+ACCEL_IDLE_RESET_S = 0.3   # pause longer than this restarts in precision mode
+ACCEL_MIN_DT_S = 0.008     # floor for dt so a 0/tiny interval can't explode speed
+ACCEL_SMOOTHING = 0.6      # speed = SMOOTHING*speed + (1-SMOOTHING)*instant
+ACCEL_V0 = 4.0             # at/below this speed the multiplier is 1
+ACCEL_VMAX = 40.0          # at/above this speed the multiplier is gmax
+ACCEL_GAIN = 9.0           # gmax = 1 + GAIN * rotate_acceleration
+
+
 class GestureDetector:
     """Detects gestures from raw button/knob events."""
 
@@ -46,6 +55,8 @@ class GestureDetector:
         # Rotation state
         self.accumulated_rotation = 0.0
         self.pressed_and_rotating = False
+        self.last_rotate_time: Optional[float] = None
+        self.rotate_speed = 0.0
 
     def on_button(self, pressed: bool):
         """Handle button down/up event."""
@@ -80,10 +91,16 @@ class GestureDetector:
                     self.button_press_count = 0
                 # else: normal click, wait for multi-click window in update()
 
-    def on_knob(self, delta: int):
-        """Handle knob rotation delta."""
-        # Accumulate rotation
-        self.accumulated_rotation += delta * self.config.rotate_sensitivity
+    def on_knob(self, delta: int, now: Optional[float] = None):
+        """Handle knob rotation delta. `now` (seconds) is injectable for tests."""
+        if not delta:
+            return  # button-only report: don't disturb rotation timing
+        if now is None:
+            now = time.time()
+
+        # Accumulate rotation (sensitivity x acceleration multiplier)
+        self.accumulated_rotation += (delta * self.config.rotate_sensitivity
+                                      * self._accel_multiplier(delta, now))
 
         threshold = 1.0
         if self.accumulated_rotation >= threshold:
@@ -95,6 +112,27 @@ class GestureDetector:
             amount = int(abs(self.accumulated_rotation))
             self.accumulated_rotation += amount
             self._fire_rotation(-amount)
+
+    def _accel_multiplier(self, delta: int, now: float) -> float:
+        """Track rotation speed and return the acceleration multiplier (>= 1)."""
+        last = self.last_rotate_time
+        self.last_rotate_time = now
+        dt = None if last is None else now - last
+        if dt is None or dt < 0 or dt > ACCEL_IDLE_RESET_S:
+            # First turn, after a pause, or clock went backwards: precision mode.
+            self.rotate_speed = 0.0
+            return 1.0
+
+        inst = abs(delta) / max(dt, ACCEL_MIN_DT_S)
+        self.rotate_speed = ACCEL_SMOOTHING * self.rotate_speed + (1 - ACCEL_SMOOTHING) * inst
+
+        a = min(self.config.rotate_acceleration, 1.0)
+        if a <= 0:
+            return 1.0
+        gmax = 1 + ACCEL_GAIN * a
+        t = (self.rotate_speed - ACCEL_V0) / (ACCEL_VMAX - ACCEL_V0)
+        t = min(max(t, 0.0), 1.0)
+        return 1 + (gmax - 1) * t * t
 
     def _fire_rotation(self, amount: int):
         """Fire a rotation event."""
