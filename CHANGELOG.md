@@ -24,7 +24,9 @@ All notable changes to this project are documented here. The format is based on
 - **Unplugging and re-plugging the knob reconnects without restarting the app.** Read
   errors other than timeouts now reach the worker (close → search again), a failed
   `claim_interface` no longer reports "connected", and LED writes racing a disconnect
-  no longer kill the LED thread. (`device.py`)
+  no longer kill the LED thread. If the device is present but its read pipe keeps
+  failing, re-searching backs off (0 s, 1 s, 2 s, 4 s, then 5 s) instead of looping
+  every 10 ms. (`device.py`, `main.py`)
 - Double/triple press with slightly longer clicks no longer splits into single presses: the multi‑click window is now measured from release, not press. (`gesture.py`)
 
 ### Added

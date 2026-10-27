@@ -276,7 +276,7 @@ def test_worker_backoff():
 def test_worker_backoff_stop():
     # find#4 happens at ~3 s and is followed by a 4 s wait; stop at 4 s
     times, end, stopped = _run_worker_clocked(lambda i: FakeDev([_eio()]), max_finds=99, stop_at=4.0)
-    assert stopped is not None, times
+    assert stopped is not None, f"never stopped ({len(times)} finds)"
     assert end - stopped <= 0.5, f"worker kept sleeping {end - stopped:.2f} s after stop"
 
 

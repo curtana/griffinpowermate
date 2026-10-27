@@ -249,6 +249,18 @@ class PowerMateApp:
         """Worker thread: USB device communication."""
         search_interval = 5  # seconds
         last_connected = False
+        # Device present but its read pipe broken ("stale driver state"): find()
+        # succeeds and read fails at once. Back off re-finding after consecutive
+        # read errors: 0 s, 1 s, 2 s, 4 s, then search_interval at most.
+        read_error_streak = 0
+
+        def wait_while_running(seconds: float):
+            # Sleep in short steps so stop() (running=False) is not held up.
+            end = time.monotonic() + seconds
+            remaining = seconds
+            while self.running and remaining > 0:
+                time.sleep(min(0.1, remaining))
+                remaining = min(remaining - 0.1, end - time.monotonic())
 
         while self.running:
             # Try to find and open device
@@ -273,11 +285,15 @@ class PowerMateApp:
                     self.gesture.update()
 
                 self.device.read_events(on_event, timeout_ms=100)
+                read_error_streak = 0   # a read (or timeout) succeeded
             except Exception as e:
                 logger.debug(f"Device read error: {e}")
                 self.device.close()
                 if self.app_window:
                     self.app_window.set_status("Device error", "red")
+                read_error_streak = min(read_error_streak + 1, 10)  # cap keeps 2**n small
+                if read_error_streak > 1:
+                    wait_while_running(min(2 ** (read_error_streak - 2), search_interval))
 
             # Update gesture state
             self.gesture.update()
