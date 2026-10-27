@@ -49,6 +49,7 @@ class GestureDetector:
         self.button_pressed = False
         self.button_press_count = 0
         self.button_press_time = 0.0
+        self.button_release_time = 0.0  # multi-click window starts at release
         self.long_press_fired = False
         self.multi_click_active = False
 
@@ -58,9 +59,10 @@ class GestureDetector:
         self.last_rotate_time: Optional[float] = None
         self.rotate_speed = 0.0
 
-    def on_button(self, pressed: bool):
-        """Handle button down/up event."""
-        now = time.time()
+    def on_button(self, pressed: bool, now: Optional[float] = None):
+        """Handle button down/up event. `now` (seconds) is injectable for tests."""
+        if now is None:
+            now = time.time()
 
         if pressed:
             if not self.button_pressed:
@@ -76,6 +78,7 @@ class GestureDetector:
             if self.button_pressed:
                 # Button just released
                 self.button_pressed = False
+                self.button_release_time = now
 
                 if self.pressed_and_rotating:
                     # We rotated while pressed: this was a press+rotate gesture,
@@ -150,12 +153,13 @@ class GestureDetector:
             else:
                 self.callback(Trigger.ROTATE_LEFT, abs(amount))
 
-    def update(self):
+    def update(self, now: Optional[float] = None):
         """
         Call this periodically (~100ms) to detect long-press and multi-click timeout.
-        Typically called from the main event loop.
+        Typically called from the main event loop. `now` (seconds) is injectable for tests.
         """
-        now = time.time()
+        if now is None:
+            now = time.time()
 
         # Detect long press (but not if the user is rotating while holding)
         if self.button_pressed and not self.long_press_fired and not self.pressed_and_rotating:
@@ -165,9 +169,9 @@ class GestureDetector:
                 self.button_press_count = 0  # Reset so multi-click doesn't fire after long press
                 self.callback(Trigger.LONG_PRESS, 0)
 
-        # Detect multi-click timeout
+        # Detect multi-click timeout (gap between clicks counts from the last release)
         if self.multi_click_active and not self.button_pressed:
-            elapsed = (now - self.button_press_time) * 1000
+            elapsed = (now - self.button_release_time) * 1000
             if elapsed >= self.config.multi_click_ms:
                 self.multi_click_active = False
 
