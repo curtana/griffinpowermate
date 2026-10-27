@@ -72,7 +72,7 @@ TIMEOUT_INTERRUPT_READ = 5000
 TIMEOUT_LED_WRITE = 2000
 
 LIBUSB_ERROR_TIMEOUT = -7
-_ETIMEDOUT = {110, getattr(errno, "ETIMEDOUT", 110)}  # Linux 110; Windows CRT 138
+_ETIMEDOUT = {110, getattr(errno, "ETIMEDOUT", 110)}  # Linux 110; Windows Python 10060
 
 
 def _is_timeout(e: "usb.core.USBError") -> bool:
