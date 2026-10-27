@@ -211,6 +211,75 @@ def test_worker_reconnect():
     assert sleeps.count(5) == 1, sleeps
 
 
+def _run_worker_clocked(make_dev, max_finds, stop_at=None):
+    """Run PowerMateApp._worker with a fake clock (time.sleep advances it).
+    make_dev(i) -> FakeDev returned by the i-th find(). Returns (find_times, end_clock, stop_clock)."""
+    import logging as _logging
+    class _NoFile(_logging.NullHandler):
+        def __init__(self, *a, **k): super().__init__()
+    with patched((_logging, "FileHandler", _NoFile)):
+        import main
+
+    clock, find_times, loops, stopped = [0.0], [], [0], [None]
+    fake_self = types.SimpleNamespace(running=True, device=PowerMateDevice(), app_window=None,
+                                      gesture=types.SimpleNamespace(on_button=lambda p: None,
+                                                                    on_knob=lambda k: None, update=lambda: _tick()))
+
+    def _tick():
+        loops[0] += 1
+        if loops[0] > 5000:
+            fake_self.running = False
+
+    def fake_find(**kw):
+        find_times.append(clock[0])
+        if len(find_times) >= max_finds:
+            fake_self.running = False
+        return make_dev(len(find_times) - 1)
+
+    def fake_sleep(s):
+        clock[0] += s
+        if stop_at is not None and stopped[0] is None and clock[0] >= stop_at:
+            stopped[0] = clock[0]
+            fake_self.running = False
+
+    with patched(*_usb_noops(), (usb.core, "find", fake_find), (main.time, "sleep", fake_sleep)):
+        main.PowerMateApp._worker(fake_self)
+    return find_times, clock[0], stopped[0]
+
+
+def _eio():
+    return usb.core.USBError("Entity not found", -1, errno.EIO)
+
+
+# (7) device present but read pipe broken: re-find waits grow 0 -> 1 -> 2 -> 4 -> 5 (cap)
+def test_worker_backoff():
+    times, _, _ = _run_worker_clocked(lambda i: FakeDev([_eio()]), max_finds=7)
+    gaps = [b - a for a, b in zip(times, times[1:])]
+    expected = [0, 1, 2, 4, 5, 5]
+    assert len(gaps) == len(expected), (times, gaps)
+    for g, e in zip(gaps, expected):
+        assert abs(g - e) < 0.05, f"gaps {gaps} != {expected}"
+
+    # a successful read (a timeout counts) resets the streak: fail, fail, ok+fail, fail
+    reads = {0: [_eio()], 1: [_eio()], 2: [usb.core.USBTimeoutError("Operation timed out", -7, 10060), _eio()],
+             3: [_eio()]}
+    times, _, _ = _run_worker_clocked(lambda i: FakeDev(reads.get(i, [_eio()])), max_finds=5)
+    gaps = [b - a for a, b in zip(times, times[1:])]
+    # after find#2 the streak is 2 (1 s wait); the timeout on dev#2 resets it, so dev#2's
+    # failure is the 1st of a new streak (0 s) and dev#3's the 2nd (1 s)
+    expected = [0, 1, 0, 1]
+    for g, e in zip(gaps, expected):
+        assert abs(g - e) < 0.05, f"gaps {gaps} != {expected}"
+
+
+# (8) stopping (running=False) during a backoff wait returns promptly
+def test_worker_backoff_stop():
+    # find#4 happens at ~3 s and is followed by a 4 s wait; stop at 4 s
+    times, end, stopped = _run_worker_clocked(lambda i: FakeDev([_eio()]), max_finds=99, stop_at=4.0)
+    assert stopped is not None, times
+    assert end - stopped <= 0.5, f"worker kept sleeping {end - stopped:.2f} s after stop"
+
+
 logging.basicConfig(level=logging.CRITICAL)
 check("(1) timeout -> silent, no callback", test_timeout_is_silent)
 check("(2) ENODEV/EIO/EPIPE USBError -> propagates", test_enodev_propagates)
@@ -219,6 +288,8 @@ check("(4) claim_interface failure -> find False, dev None", test_claim_failure)
 check("find success / absent", test_find_success_and_absent)
 check("(5) close vs set_brightness race -> no exception", test_close_vs_brightness_race)
 check("(6) worker: read error -> close -> re-find", test_worker_reconnect)
+check("(7) worker: repeated read errors -> growing re-find wait", test_worker_backoff)
+check("(8) worker: stop during backoff wait returns promptly", test_worker_backoff_stop)
 
 print()
 if fails:
