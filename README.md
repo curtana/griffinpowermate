@@ -331,7 +331,9 @@ warning is logged at startup.
 range (e.g. `"multi_click_ms": 10`, `"mode": "rainbow"`, `"fade_speed": 0`, flash on
 and off both `0`, an `amount` that isn't a number) is replaced by its default and a
 `config: <setting> = <value> invalid, using <default>` warning goes to `powermate.log`.
-The replacement is in memory only — `config.json` is not rewritten. Numeric strings
+The replacement is in memory only — loading never rewrites `config.json`; the next time
+the settings window saves (Save, adding/deleting a profile, the Start with Windows
+toggle) it writes the current settings, replacements included. Numeric strings
 such as `"250"` are accepted, and a shortcut written as a number (`"keys": 1`) is read
 as the key `"1"`. Ranges: `multi_click_ms` 50–2000, `long_press_ms` 100–5000,
 `rotate_sensitivity` above 0 up to 10, `rotate_acceleration` 0–1, `brightness` 0–1,
