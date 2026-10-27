@@ -6,8 +6,12 @@ import threading
 import os
 from typing import Dict, Any, Optional
 
+from paths import data_path
+
 logger = logging.getLogger(__name__)
 
+# File name only; the folder comes from paths.data_path() when the Config is
+# created (next to the app, not the CWD — see paths.py).
 CONFIG_FILE = "config.json"
 
 DEFAULT_CONFIG = {
@@ -63,8 +67,8 @@ DEFAULT_CONFIG = {
 class Config:
     """Configuration loader and manager."""
 
-    def __init__(self, config_file: str = CONFIG_FILE):
-        self.config_file = config_file
+    def __init__(self, config_file: Optional[str] = None):
+        self.config_file = config_file or data_path(CONFIG_FILE)
         self.config: Dict[str, Any] = {}
         # Reentrant: reload() holds the lock and may call save() (first run).
         self._lock = threading.RLock()

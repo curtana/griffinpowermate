@@ -1,9 +1,12 @@
 """Main application: orchestration, worker threads, tray."""
+import sys
 import threading
 import time
 import logging
-from typing import Optional
+from typing import List, Optional
 import customtkinter as ctk
+
+import paths
 
 from device import PowerMateDevice
 from gesture import GestureDetector, GestureConfig, Trigger
@@ -16,16 +19,36 @@ from tray import TrayIcon
 from ui.app_window import AppWindow
 from ui.osd import OSD, TRIGGER_LABELS, action_label
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('powermate.log'),
-        logging.StreamHandler()
-    ]
-)
 logger = logging.getLogger(__name__)
+
+LOG_FILE = "powermate.log"
+LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+
+
+def setup_logging(argv: Optional[List[str]] = None):
+    """Log to the console and to powermate.log in the data folder (paths.py).
+
+    Called from main(), not at import, so importing this module never writes a
+    file into the CWD. If the log file can't be opened the app keeps running on
+    the console handler alone. A `debug` argument turns on DEBUG level."""
+    argv = sys.argv if argv is None else argv
+    level = logging.DEBUG if "debug" in argv[1:] else logging.INFO
+    handlers: List[logging.Handler] = [logging.StreamHandler()]
+    log_file = None
+    file_error = None
+    try:
+        log_file = paths.data_path(LOG_FILE)
+        handlers.insert(0, logging.FileHandler(log_file))
+    except Exception as e:
+        file_error = e
+    # force=True: a module may already have logged at import time (e.g.
+    # app_monitor's pywin32 warning), which implicitly configures the root.
+    logging.basicConfig(level=level, format=LOG_FORMAT, handlers=handlers, force=True)
+    if file_error is not None:
+        logger.warning(f"Could not open log file {log_file}: {file_error}; logging to console only")
+    if paths.fallback_used():
+        logger.warning(f"App folder {paths.app_dir()} is not writable; "
+                       f"using {paths.data_dir()} for config and log")
 
 
 class PowerMateApp:
@@ -264,6 +287,7 @@ class PowerMateApp:
 
 def main():
     """Entry point."""
+    setup_logging()
     try:
         app = PowerMateApp()
         app.start()
