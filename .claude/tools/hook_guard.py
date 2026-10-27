@@ -9,6 +9,7 @@ r"""
 모드(첫 인자)
   pretool   PreToolUse(Bash·PowerShell): 입력을 기다리는 형태(python REPL·`python -`·`-i`, 페이저·편집기,
             메시지 없는 `git commit`, git -i/-p, Read-Host·Get-Credential·pause·Out-GridView)를 누구든 거부한다.
+            서브에이전트(agent_id 있음)의 시스템 python도 거부한다 → venv python만.
             PreToolUse(Write·Edit·NotebookEdit): reviewer는
             메인 저장소 `_workspace/` 안에서만 허용.
             한계: 명령 문자열과 대상 경로만 본다 — 스크립트 안에서 하는 쓰기는 못 잡는다(9-6).
@@ -34,10 +35,10 @@ from typing import Iterator, List, Optional
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.environ.get("TEAM_REPO", os.path.dirname(os.path.dirname(HERE)))   # .claude/tools/ 의 두 단계 위
 LOG_DIR = os.path.join(REPO, "_workspace", "hooks")
-SUB_PYTHON_ONLY = "false" == "true"
+SUB_PYTHON_ONLY = "true" == "true"
 PY_REPL_DENY = "true" == "true"   # false(프로젝트 예외)면 `python -` 허용, 단독 python·-i는 계속 거부
-VENV_PY = r""
-VENV_PY_POSIX = ""
+VENV_PY = r"G:\workspace\PowerMate\.venv\Scripts\python.exe"
+VENV_PY_POSIX = "/g/workspace/PowerMate/.venv/Scripts/python.exe"
 TASKS_ROOT = os.environ.get("TASKS_ROOT", r"C:\Users\curta\AppData\Local\Temp\claude\G--workspace-PowerMate")
 BIG_MB = int(os.environ.get("LEFTOVER_BIG_MB", "100"))
 OUT_DIR = "_workspace"

@@ -23,7 +23,7 @@
 
 ### 완료 기준 (DoD)
 - [ ] <검증 가능한 조건 — "값이 들어갔나"가 아니라 "결과가 맞나">
-- [ ] 기존 테스트 전체 통과(`python _test_gesture.py && python _test_features.py && python _smoketest_gui.py 2>&1 | tail -n 30`)
+- [ ] 기존 테스트 전체 통과(`/g/workspace/PowerMate/.venv/Scripts/python.exe _test_gesture.py && /g/workspace/PowerMate/.venv/Scripts/python.exe _test_features.py && /g/workspace/PowerMate/.venv/Scripts/python.exe _smoketest_gui.py 2>&1 | tail -n 30`)
 - [ ] (검수 필수 시) 강조점을 명시해 검수 요청
 - [ ] 완료 보고에 잔여 점검(`check_leftovers.sh`) 출력
 
