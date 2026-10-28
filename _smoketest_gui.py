@@ -63,6 +63,44 @@ def main():
             assert ed.current_action == "mute", f"press action = {ed.current_action}"
         check("bindings_loaded", check_bindings_loaded)
 
+        # Regression (#19): right after create(), with no clicks, every trigger
+        # row is drawn with the default profile's action, no row is inflated by
+        # an empty parameter frame, and press / double_press sit inside the
+        # visible part of the scroll area.
+        def check_bindings_rows_visible():
+            root.update_idletasks()
+            pv = aw.profile_view
+            want = cfg.get_profile_raw("default")
+            canvas_h = pv.frame._parent_canvas.winfo_height()
+            for trigger, ed in pv.action_editors.items():
+                assert ed.winfo_ismapped(), f"{trigger} row not mapped"
+                expected = want.get(trigger, {}).get("action", "none")
+                assert ed.action_dropdown.get() == expected, \
+                    f"{trigger} dropdown = {ed.action_dropdown.get()!r}, want {expected!r}"
+                # A row is as tall as its tallest widget (dropdown or entry).
+                assert ed.winfo_height() <= 2 * ed.action_dropdown.winfo_height(), \
+                    f"{trigger} row is {ed.winfo_height()}px tall"
+            for trigger in ("press", "double_press"):
+                ed = pv.action_editors[trigger]
+                bottom = ed.winfo_y() + ed.winfo_height()
+                assert bottom <= canvas_h, \
+                    f"{trigger} row ends at y={bottom}, visible area is {canvas_h}px"
+        check("bindings_rows_visible", check_bindings_rows_visible)
+
+        # Changing the dropdown shows / hides the parameter frame again.
+        def check_param_frame_toggle():
+            ed = aw.profile_view.action_editors["press"]
+            ed._on_action_changed("volume_up")
+            root.update_idletasks()
+            assert ed.param_frame.winfo_ismapped(), "param frame hidden for volume_up"
+            assert "amount" in ed.param_widgets
+            ed._on_action_changed("mute")
+            root.update_idletasks()
+            assert not ed.param_frame.winfo_ismapped(), "empty param frame still shown"
+            assert ed.winfo_height() <= 2 * ed.action_dropdown.winfo_height(), ed.winfo_height()
+            aw._select_profile("default")
+        check("param_frame_toggle", check_param_frame_toggle)
+
         # Exercise: round-trip a binding edit through save -> raw config.
         def check_save_roundtrip():
             ed = aw.profile_view.action_editors["rotate_right"]
