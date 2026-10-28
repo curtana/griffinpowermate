@@ -305,16 +305,24 @@ class AppWindow:
 
     def _reload(self):
         self.config.reload()
+        self.reload_from_config("Reloaded")
+
+    def reload_from_config(self, message: str = "Reloaded"):
+        """Show the in-memory config in the profile list and every panel (Tk
+        thread only). Unsaved input in the panels is replaced. The selected
+        profile stays selected unless it no longer exists; then 'default'."""
+        if self.selected_profile not in self.config.get_profiles():
+            self.selected_profile = "default"
         self._refresh_profile_list()
         if self.profile_view:
-            self.profile_view.reload()
+            self.profile_view.load_profile(self.selected_profile or "default")
         if self.led_panel:
             self.led_panel.reload()
         if self.timing_panel:
             self.timing_panel.reload()
         if self.osd_panel:
             self.osd_panel.reload()
-        self.set_status("Reloaded", "green")
+        self.set_status(message, "green")
 
     def _hide_to_tray(self):
         self.hide()

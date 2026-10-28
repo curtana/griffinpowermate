@@ -85,8 +85,8 @@ class PowerMateApp:
         self.paused = False
         self.worker_thread: Optional[threading.Thread] = None
 
-        # Config change callback
-        self.config.on_change(self._on_config_change)
+        # config.json changed outside the app (runs on the config watcher thread)
+        self.config.on_change(self._on_config_file_change)
 
     def _setup_led_from_config(self):
         """Setup LED controller from config (values already validated by Config)."""
@@ -244,8 +244,30 @@ class PowerMateApp:
         if action_config:
             self.executor.execute(action_config, amount)
 
+    def _on_config_file_change(self):
+        """Called on the config watcher thread after config.json was re-read.
+
+        Tk widgets (OSD, settings panels) are only safe on the Tk thread, so the
+        work is handed to it with after(). Before the window exists the OSD has
+        no Tk root yet and there is no panel, so the change is applied here."""
+        window = self.app_window.window if self.app_window else None
+        if window is None:
+            self._on_config_change()
+            return
+        try:
+            window.after(0, self._apply_config_from_file)
+        except Exception as e:   # Tk already torn down (quitting)
+            logger.debug(f"Config change not applied, Tk is gone: {e}")
+
+    def _apply_config_from_file(self):
+        """Tk thread: apply config.json as re-read from file, and show it in the
+        settings window. The file wins over unsaved input in the window."""
+        self._on_config_change()
+        if self.app_window:
+            self.app_window.reload_from_config("Config reloaded from file")
+
     def _on_config_change(self):
-        """Called when config is reloaded."""
+        """Apply the in-memory config (GUI Save / Test LED, or a file re-read)."""
         logger.info("Config changed, reloading...")
         self._setup_led_from_config()
         self._apply_osd_from_config()
