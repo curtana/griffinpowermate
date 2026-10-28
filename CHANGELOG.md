@@ -15,6 +15,7 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 - Bindings tab: rows for actions without parameters (`press`, `double_press`, …) are no longer 200 px tall, so all rows show at startup (#19). (`ui/action_editor.py`)
+- Shortcut recording: NumLock no longer records as `alt`, and Shift+digit/symbol records the base key (`shift+1`, not `shift+exclam`) so `keyboard` can replay it (#18). (`ui/action_editor.py`)
 
 ## [1.3.1] — 2026-10-28
 
