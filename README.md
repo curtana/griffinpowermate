@@ -198,7 +198,9 @@ the `osd` block of `config.json` and apply live.
   - **- Delete Profile** removes the selected profile (`default` cannot be deleted).
 - **Bindings tab** — a row for each of the 8 triggers. Pick an **action** and fill in its
   parameters. The `key` action has a **Record** button: click it, press your shortcut, and
-  it captures the combo (e.g. `ctrl+shift+n`).
+  it captures the combo (e.g. `ctrl+shift+n`). Only the modifiers you hold are recorded
+  (NumLock/CapsLock are ignored), and Shift+digit/symbol records the base key
+  (`shift+1`), so the result replays as typed. Number-pad keys aren't mapped yet.
 - **LED tab** — choose the mode, brightness, pulse speed/waveform, flash timing, and
   volume‑fade timing. **Test LED** applies the settings to the device live.
 - **Timing tab** — multi‑click window, long‑press threshold, rotation sensitivity.
@@ -495,13 +497,14 @@ python _test_device.py      # USB read timeouts vs errors, claim failure, reconn
 python _test_config.py      # config validation/fallbacks, LED thread survives bad values, GUI save
 python _test_paths.py       # config/log location, %LOCALAPPDATA% fallback, logging setup
 python _test_version.py     # EXE file-properties resource, version matches CHANGELOG
+python _test_record.py      # shortcut recording: modifiers, NumLock, Shift+digit -> keyboard names
 python _smoketest_gui.py    # builds the GUI, exercises profiles/panels/save, tears down
 ```
 
 The gesture tests cover single/double/triple/long press, both rotations, press‑while‑rotate,
 and regressions for "no spurious press after press+rotate" and "no long‑press while
 rotating." The GUI smoke test verifies the window builds, the default profile auto‑loads all
-8 trigger editors, bindings round‑trip through save, the LED/Timing tabs populate, and
+8 trigger editors and every row is visible at startup without a click, bindings round‑trip through save, the LED/Timing tabs populate, and
 profile inheritance works.
 
 Hardware was validated end‑to‑end: rotation → volume, press → mute, button detection, and
@@ -573,6 +576,7 @@ powermate-app/
 ├── _test_features.py       # macro / startup / debug-panel tests
 ├── _test_paths.py          # config/log location + logging setup tests
 ├── _test_version.py        # EXE version resource tests
+├── _test_record.py         # shortcut-recording conversion tests
 ├── _test_device.py         # USB read/reconnect tests (fake device)
 ├── _test_config.py         # config validation tests
 ├── _smoketest_gui.py       # GUI smoke test
