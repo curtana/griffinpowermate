@@ -39,7 +39,9 @@ class TrayIcon:
         """Stop the tray icon."""
         if self.icon:
             self.icon.stop()
-        if self.thread:
+        # The Exit menu callback runs on the tray thread: joining it there would
+        # raise (cannot join current thread), and icon.stop() already ends run().
+        if self.thread and self.thread is not threading.current_thread():
             self.thread.join(timeout=2)
         logger.info("Tray icon stopped")
 

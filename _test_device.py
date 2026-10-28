@@ -280,6 +280,122 @@ def test_worker_backoff_stop():
     assert end - stopped <= 0.5, f"worker kept sleeping {end - stopped:.2f} s after stop"
 
 
+def _import_main():
+    import logging as _logging
+    class _NoFile(_logging.NullHandler):
+        def __init__(self, *a, **k): super().__init__()
+    with patched((_logging, "FileHandler", _NoFile)):   # don't create powermate.log on import
+        import main
+    return main
+
+
+class SlowTimeoutDev(FakeDev):
+    """A connected knob with no input: every read waits like a real 100 ms poll, then times out."""
+    def read(self, ep, size, timeout=None):
+        time.sleep(0.1)
+        raise usb.core.USBTimeoutError("Operation timed out", -7, 138)
+
+
+# (9) stop(): the worker is joined first, the device is closed after it has exited
+def test_stop_closes_after_worker():
+    main = _import_main()
+    events = []
+    with patched(*_usb_noops()):
+        dev = _dev_with(SlowTimeoutDev())
+        real_close = dev.close
+        def close():
+            events.append("close"); real_close()
+        dev.close = close
+        fake_self = types.SimpleNamespace(running=True, device=dev, app_window=None,
+                                          led=types.SimpleNamespace(stop=lambda: events.append("led")),
+                                          gesture=types.SimpleNamespace(on_button=lambda p: None,
+                                                                        on_knob=lambda k: None, update=lambda: None))
+        def run():
+            main.PowerMateApp._worker(fake_self)
+            events.append("worker_exit")
+        fake_self.worker_thread = threading.Thread(target=run, daemon=True)
+        fake_self.worker_thread.start()
+        time.sleep(0.05)   # the worker is now inside a 100 ms read
+        main.PowerMateApp.stop(fake_self)
+    assert events == ["led", "worker_exit", "close"], events
+    assert dev.dev is None
+
+    # a worker that does not finish within the join timeout: warn, then close anyway
+    warnings, hold = [], threading.Event()
+    class _Catch(logging.Handler):
+        def emit(self, record):
+            if record.levelno >= logging.WARNING: warnings.append(record.getMessage())
+    h = _Catch(); main.logger.addHandler(h)
+    old_level = main.logger.level; main.logger.setLevel(logging.WARNING)   # root is CRITICAL here
+    try:
+        with patched(*_usb_noops()):
+            dev = _dev_with(FakeDev())
+            stuck = threading.Thread(target=hold.wait, daemon=True); stuck.start()
+            fake_self = types.SimpleNamespace(running=True, device=dev, led=None, worker_thread=stuck)
+            t0 = time.monotonic()
+            main.PowerMateApp.stop(fake_self)
+            assert time.monotonic() - t0 < 3, "stop() must not wait past the join timeout"
+            assert dev.dev is None, "device must still be closed"
+            assert warnings, "a stuck worker must be logged as a warning"
+    finally:
+        hold.set(); main.logger.removeHandler(h); main.logger.setLevel(old_level)
+
+
+# (10) button = bit 0 of byte0: 0x03 -> pressed, 0x02 -> released
+def test_worker_button_bit0():
+    main = _import_main()
+    presses = []
+    fake_self = types.SimpleNamespace(running=True, app_window=None,
+                                      device=_dev_with(FakeDev([[0x03, 0, 0, 0, 0, 0], [0x02, 0, 0, 0, 0, 0]])))
+    def on_button(p):
+        presses.append(p)
+        if len(presses) >= 2:
+            fake_self.running = False
+    fake_self.gesture = types.SimpleNamespace(on_button=on_button, on_knob=lambda k: None, update=lambda: None)
+    with patched(*_usb_noops(), (main.time, "sleep", lambda s: None)):
+        main.PowerMateApp._worker(fake_self)
+    assert presses == [True, False], presses
+
+
+# (11) find() failing resets the read-error streak: a replugged knob's first error waits 0 s
+def test_worker_find_fail_resets_streak():
+    # find#0 err (streak 1, 0 s), find#1 err (streak 2, 1 s), find#2 absent (5 s), find#3 err -> 0 s
+    times, _, _ = _run_worker_clocked(lambda i: None if i == 2 else FakeDev([_eio()]), max_finds=5)
+    gaps = [b - a for a, b in zip(times, times[1:])]
+    expected = [0, 1, 5, 0]
+    assert len(gaps) == len(expected), (times, gaps)
+    for g, e in zip(gaps, expected):
+        assert abs(g - e) < 0.05, f"gaps {gaps} != {expected}"
+
+
+# (12) TrayIcon.stop() called on the tray thread itself (Exit menu -> _quit) does not hang or raise
+def test_tray_stop_from_own_thread():
+    import tray
+    result = {}
+    class FakeIcon:
+        def __init__(self, *a, **kw):
+            self.stopped = threading.Event()
+        def run(self):
+            t0 = time.monotonic()
+            try:
+                ti.stop()   # what the Exit menu callback ends up doing
+            except Exception as e:
+                result["error"] = e
+            result["elapsed"] = time.monotonic() - t0
+            self.stopped.wait(2)
+        def stop(self):
+            self.stopped.set()
+    with patched((tray, "Icon", FakeIcon), (tray, "Menu", lambda *a, **k: None),
+                 (tray, "MenuItem", lambda *a, **k: None)):
+        ti = tray.TrayIcon("missing.ico")
+        ti.start()
+        ti.thread.join(5)
+    assert not ti.thread.is_alive(), "tray thread did not finish"
+    assert "error" not in result, result
+    assert result["elapsed"] < 0.5, result
+    assert ti.icon.stopped.is_set()
+
+
 logging.basicConfig(level=logging.CRITICAL)
 check("(1) timeout -> silent, no callback", test_timeout_is_silent)
 check("(2) ENODEV/EIO/EPIPE USBError -> propagates", test_enodev_propagates)
@@ -290,6 +406,10 @@ check("(5) close vs set_brightness race -> no exception", test_close_vs_brightne
 check("(6) worker: read error -> close -> re-find", test_worker_reconnect)
 check("(7) worker: repeated read errors -> growing re-find wait", test_worker_backoff)
 check("(8) worker: stop during backoff wait returns promptly", test_worker_backoff_stop)
+check("(9) stop(): close the device after the worker has exited", test_stop_closes_after_worker)
+check("(10) worker: button = bit 0 of byte0", test_worker_button_bit0)
+check("(11) worker: find() failure resets the read-error streak", test_worker_find_fail_resets_streak)
+check("(12) TrayIcon.stop() on the tray thread itself", test_tray_stop_from_own_thread)
 
 print()
 if fails:

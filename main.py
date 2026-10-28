@@ -139,11 +139,15 @@ class PowerMateApp:
         if self.led:
             self.led.stop()
 
-        if self.device.dev:
-            self.device.close()
-
+        # Join the worker before closing the device so close() never runs under a
+        # read in progress. A worker that misses the timeout doesn't block quitting.
         if self.worker_thread:
             self.worker_thread.join(timeout=2)
+            if self.worker_thread.is_alive():
+                logger.warning("Device worker did not stop within 2 s; closing the device anyway")
+
+        if self.device.dev:
+            self.device.close()
 
         logger.info("PowerMate app stopped")
 
@@ -191,8 +195,15 @@ class PowerMateApp:
         logger.info("PowerMate resumed")
 
     def _quit(self):
-        """Quit the application (invoked from the tray thread)."""
+        """Quit the application (invoked from the tray thread or the GUI)."""
         self.stop()
+        # Remove the tray icon now instead of leaving it until the process exits.
+        # TrayIcon.stop() skips the join when called on the tray thread itself.
+        if self.tray:
+            try:
+                self.tray.stop()
+            except Exception as e:
+                logger.debug(f"Error stopping tray icon: {e}")
         # Tk must be torn down on its own (main) thread.
         if self.app_window and self.app_window.window:
             try:
@@ -277,13 +288,14 @@ class PowerMateApp:
                     if last_connected and self.app_window:
                         self.app_window.set_status("PowerMate not found", "red")
                     last_connected = False
+                    read_error_streak = 0   # a later reconnect starts a fresh streak
                     time.sleep(search_interval)
                     continue
 
             # Read events
             try:
                 def on_event(button: int, knob_delta: int):
-                    self.gesture.on_button(button == 1)
+                    self.gesture.on_button(bool(button & 1))   # bit 0 of byte0 = pressed
                     self.gesture.on_knob(knob_delta)
                     self.gesture.update()
 
