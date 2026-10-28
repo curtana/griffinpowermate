@@ -51,9 +51,9 @@ class ActionEditor(ctk.CTkFrame):
         )
         self.action_dropdown.pack(side="left", padx=5)
 
-        # Parameter frame (changes based on action)
+        # Parameter frame (changes based on action). Packed by _refresh_params
+        # only while it holds widgets.
         self.param_frame = ctk.CTkFrame(self)
-        self.param_frame.pack(side="left", fill="x", expand=True, padx=5)
 
     def _on_action_changed(self, action: str):
         """Handle action selection change."""
@@ -112,6 +112,14 @@ class ActionEditor(ctk.CTkFrame):
             entry = ctk.CTkEntry(self.param_frame, width=200)
             entry.pack(side="left", padx=2)
             self.param_widgets["command"] = entry
+
+        # An empty CTkFrame keeps its default 200x200 size, which made rows for
+        # actions without parameters (mute, media_*, none) 200px tall and
+        # pushed the rows below out of view (#19). Show it only when filled.
+        if self.param_widgets:
+            self.param_frame.pack(side="left", fill="x", expand=True, padx=5)
+        else:
+            self.param_frame.pack_forget()
 
     # Tkinter keysym -> 'keyboard' library name normalisation
     _KEYSYM_MAP = {

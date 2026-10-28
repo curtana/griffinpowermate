@@ -13,6 +13,9 @@ All notable changes to this project are documented here. The format is based on
   build command, LED and acceleration notes, status text), `install.bat` (WinUSB; the
   `>` in the Zadig hint was redirecting output to a file instead of printing it).
 
+### Fixed
+- Bindings tab: rows for actions without parameters (`press`, `double_press`, …) are no longer 200 px tall, so all rows show at startup (#19). (`ui/action_editor.py`)
+
 ## [1.3.1] — 2026-10-28
 
 ### Added
