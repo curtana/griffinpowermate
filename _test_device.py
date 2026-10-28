@@ -199,7 +199,7 @@ def test_worker_reconnect():
         return dev
 
     def fake_sleep(s):
-        sleeps.append(s)
+        sleeps.append((len(finds), s))   # tagged with how many find() calls happened so far
 
     with patched(*_usb_noops(), (usb.core, "find", fake_find), (main.time, "sleep", fake_sleep)):
         main.PowerMateApp._worker(fake_self)
@@ -207,8 +207,13 @@ def test_worker_reconnect():
     assert finds == [first, None, second], finds
     assert fake_self.device.dev is second
     assert statuses == ["PowerMate connected", "Device error", "PowerMate not found", "PowerMate connected"], statuses
-    # exactly one 5-second wait while the device was absent; no 5 s wait between close and re-find
-    assert sleeps.count(5) == 1, sleeps
+    # The absent wait runs in short steps (wait_while_running), so add them up:
+    # one ~5-second wait while the device was absent (after find#2, before find#3) ...
+    absent = sum(s for n, s in sleeps if n == 2)
+    assert abs(absent - 5) < 0.05, sleeps
+    # ... and no wait between close and re-find (only the 10 ms loop sleep after find#1)
+    after_close = sum(s for n, s in sleeps if n == 1)
+    assert after_close <= 0.011, sleeps
 
 
 def _run_worker_clocked(make_dev, max_finds, stop_at=None):
@@ -396,6 +401,35 @@ def test_tray_stop_from_own_thread():
     assert ti.icon.stopped.is_set()
 
 
+# (13) stop() while the worker waits for an absent knob returns within 1 s, without a warning
+def test_stop_during_absent_wait():
+    main = _import_main()
+    warnings = []
+    class _Catch(logging.Handler):
+        def emit(self, record):
+            if record.levelno >= logging.WARNING: warnings.append(record.getMessage())
+    h = _Catch(); main.logger.addHandler(h)
+    old_level = main.logger.level; main.logger.setLevel(logging.WARNING)   # root is CRITICAL here
+    finds = []
+    try:
+        with patched(*_usb_noops(), (usb.core, "find", lambda **kw: finds.append(1))):   # always absent
+            fake_self = types.SimpleNamespace(running=True, device=PowerMateDevice(), app_window=None, led=None,
+                                              gesture=types.SimpleNamespace(on_button=lambda p: None,
+                                                                            on_knob=lambda k: None, update=lambda: None))
+            fake_self.worker_thread = threading.Thread(target=main.PowerMateApp._worker, args=(fake_self,), daemon=True)
+            fake_self.worker_thread.start()
+            time.sleep(0.3)   # the worker is now in the 5 s "not found" wait
+            assert finds, "worker never searched for the device"
+            t0 = time.monotonic()
+            main.PowerMateApp.stop(fake_self)
+            elapsed = time.monotonic() - t0
+            fake_self.worker_thread.join(6)   # let a slow (old) worker finish before patches are undone
+    finally:
+        main.logger.removeHandler(h); main.logger.setLevel(old_level)
+    assert elapsed < 1, f"stop() took {elapsed:.2f} s"
+    assert not warnings, warnings
+
+
 logging.basicConfig(level=logging.CRITICAL)
 check("(1) timeout -> silent, no callback", test_timeout_is_silent)
 check("(2) ENODEV/EIO/EPIPE USBError -> propagates", test_enodev_propagates)
@@ -410,6 +444,7 @@ check("(9) stop(): close the device after the worker has exited", test_stop_clos
 check("(10) worker: button = bit 0 of byte0", test_worker_button_bit0)
 check("(11) worker: find() failure resets the read-error streak", test_worker_find_fail_resets_streak)
 check("(12) TrayIcon.stop() on the tray thread itself", test_tray_stop_from_own_thread)
+check("(13) stop() during the no-device wait -> < 1 s, no warning", test_stop_during_absent_wait)
 
 print()
 if fails:

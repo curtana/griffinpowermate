@@ -289,7 +289,7 @@ class PowerMateApp:
                         self.app_window.set_status("PowerMate not found", "red")
                     last_connected = False
                     read_error_streak = 0   # a later reconnect starts a fresh streak
-                    time.sleep(search_interval)
+                    wait_while_running(search_interval)   # stop() must not wait out the 5 s
                     continue
 
             # Read events
