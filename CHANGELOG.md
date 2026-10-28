@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-10-28
+
+### Added
+- **EXE file properties.** `PowerMate.exe` now shows a product name ("Griffin PowerMate
+  Controller") and file/product version in Explorer → Properties → Details. The values
+  come from `version.py` (single source; bump it before tagging), and `build.spec`
+  generates the Windows version resource on every build. (`version.py`, `build.spec`)
+
 ## [1.3.0] — 2026-10-27
 
 ### Fixed
@@ -161,7 +169,8 @@ All notable changes to this project are documented here. The format is based on
   power cycle. Hardware pulse modes are therefore disabled on Windows; pulse/flash are
   done in software.
 
-[Unreleased]: https://github.com/curtana/griffinpowermate/compare/v1.3.0...develop
+[Unreleased]: https://github.com/curtana/griffinpowermate/compare/v1.3.1...develop
+[1.3.1]: https://github.com/curtana/griffinpowermate/releases/tag/v1.3.1
 [1.3.0]: https://github.com/curtana/griffinpowermate/releases/tag/v1.3.0
 [1.2.0]: https://github.com/accolytebyte/griffinpowermate/releases/tag/v1.2.0
 [1.1.1]: https://github.com/accolytebyte/griffinpowermate/releases/tag/v1.1.1

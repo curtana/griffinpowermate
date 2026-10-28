@@ -380,7 +380,12 @@ pyinstaller --noconfirm --clean build.spec
 - locates and bundles `libusb-1.0.dll` from the `libusb` package,
 - collects CustomTkinter's theme/asset data files,
 - bundles `assets/icon.ico`,
-- adds the required hidden imports (`comtypes`, `pycaw`, `pystray._win32`, pywin32 modules).
+- adds the required hidden imports (`comtypes`, `pycaw`, `pystray._win32`, pywin32 modules),
+- writes the EXE's file properties (product name, file/product version) from
+  `version.py` into `build/_build_info/version_info.txt` and links it to the EXE.
+
+Before tagging a release, bump `VERSION` and `RELEASE_DATE` in `version.py` to match
+the new dated `CHANGELOG.md` section (`_test_version.py` checks this).
 
 At runtime the app finds the bundled DLL via `sys._MEIPASS`, so the EXE is fully
 self‑contained — only the **WinUSB driver** (Zadig) is needed on the target machine.
@@ -482,6 +487,7 @@ Three test suites run **without** hardware:
 python _test_gesture.py     # gesture state machine: all 8 triggers + regressions
 python _test_features.py    # macro action, startup module, debug panel, triple/long bindings
 python _test_paths.py       # config/log location, %LOCALAPPDATA% fallback, logging setup
+python _test_version.py     # EXE file-properties resource, version matches CHANGELOG
 python _smoketest_gui.py    # builds the GUI, exercises profiles/panels/save, tears down
 ```
 
@@ -540,6 +546,7 @@ powermate-app/
 ├── app_monitor.py          # active-app detection
 ├── config.py               # config load/save/watch
 ├── paths.py                # app / data / resource folders
+├── version.py              # version + EXE file-properties resource
 ├── startup.py              # start-with-Windows (HKCU Run key)
 ├── tray.py                 # system tray
 ├── ui/
@@ -556,6 +563,7 @@ powermate-app/
 ├── _test_gesture.py        # gesture unit tests
 ├── _test_features.py       # macro / startup / debug-panel tests
 ├── _test_paths.py          # config/log location + logging setup tests
+├── _test_version.py        # EXE version resource tests
 ├── _smoketest_gui.py       # GUI smoke test
 ├── README.md
 └── QUICKSTART.md
