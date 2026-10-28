@@ -13,6 +13,9 @@ All notable changes to this project are documented here. The format is based on
   build command, LED and acceleration notes, status text), `install.bat` (WinUSB; the
   `>` in the Zadig hint was redirecting output to a file instead of printing it).
 
+### Fixed
+- Shortcut recording: NumLock no longer records as `alt`, and Shift+digit/symbol records the base key (`shift+1`, not `shift+exclam`) so `keyboard` can replay it (#18). (`ui/action_editor.py`)
+
 ## [1.3.1] — 2026-10-28
 
 ### Added

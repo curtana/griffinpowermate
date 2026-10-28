@@ -119,7 +119,63 @@ class ActionEditor(ctk.CTkFrame):
         "Next": "page down", "BackSpace": "backspace", "Delete": "delete",
         "Up": "up", "Down": "down", "Left": "left", "Right": "right",
         "space": "space", "Tab": "tab", "Home": "home", "End": "end",
+        # Punctuation keysyms -> the character name 'keyboard' knows.
+        "minus": "-", "equal": "=", "bracketleft": "[", "bracketright": "]",
+        "backslash": "\\", "semicolon": ";", "apostrophe": "'", "comma": ",",
+        "period": ".", "slash": "/", "grave": "`",
+        # Shifted symbols (US layout) -> the unshifted base key, so that
+        # Shift+1 records as "shift+1" rather than "shift+exclam".
+        "exclam": "1", "at": "2", "numbersign": "3", "dollar": "4",
+        "percent": "5", "asciicircum": "6", "ampersand": "7", "asterisk": "8",
+        "parenleft": "9", "parenright": "0", "underscore": "-", "plus": "=",
+        "braceleft": "[", "braceright": "]", "bar": "\\", "colon": ";",
+        "quotedbl": "'", "less": ",", "greater": ".", "question": "/",
+        "asciitilde": "`",
     }
+
+    # Tk event.state modifier bits. On Windows Tk reports Alt as 0x20000 and
+    # uses 0x0008 for NumLock, so 0x0008 only means Alt elsewhere.
+    _STATE_SHIFT = 0x0001
+    _STATE_CONTROL = 0x0004
+    _STATE_MOD1 = 0x0008
+    _STATE_ALT_WIN = 0x20000
+
+    @staticmethod
+    def combo_from_key(keysym: str, state: int, keycode: Optional[int] = None,
+                       platform: Optional[str] = None) -> str:
+        """Turn a Tk key event into a 'keyboard'-style combo, e.g. 'ctrl+shift+1'.
+
+        Only the modifiers actually held are included (CapsLock / NumLock are
+        ignored) and the key name is the base key, so the result can be
+        replayed with keyboard.send().
+        """
+        if platform is None:
+            import sys
+            platform = sys.platform
+        win = platform == "win32"
+
+        parts = []
+        if state & ActionEditor._STATE_CONTROL:
+            parts.append("ctrl")
+        if state & ActionEditor._STATE_SHIFT:
+            parts.append("shift")
+        alt_mask = ActionEditor._STATE_ALT_WIN
+        if not win:
+            alt_mask |= ActionEditor._STATE_MOD1
+        if state & alt_mask:
+            parts.append("alt")
+
+        # On Windows event.keycode is the virtual-key code; for letters and
+        # top-row digits it equals the ASCII code of the key on every layout,
+        # so it gives the base key even when the keysym is shifted or comes
+        # from an IME.
+        if win and keycode is not None and (0x30 <= keycode <= 0x39
+                                            or 0x41 <= keycode <= 0x5A):
+            key = chr(keycode).lower()
+        else:
+            key = ActionEditor._KEYSYM_MAP.get(keysym, keysym.lower())
+        parts.append(key)
+        return "+".join(parts)
 
     def _record_into(self, target_entry):
         """Open a modal that captures the next key combination into target_entry."""
@@ -144,18 +200,7 @@ class ActionEditor(ctk.CTkFrame):
                 dialog.destroy()
                 return
 
-            parts = []
-            state = event.state
-            if state & 0x0004:
-                parts.append("ctrl")
-            if state & 0x0001:
-                parts.append("shift")
-            if state & 0x20000 or state & 0x0008:  # Alt (Mod / Alt)
-                parts.append("alt")
-
-            key = self._KEYSYM_MAP.get(keysym, keysym.lower())
-            parts.append(key)
-            combo = "+".join(parts)
+            combo = self.combo_from_key(keysym, event.state, event.keycode)
 
             target_entry.delete(0, tk.END)
             target_entry.insert(0, combo)
