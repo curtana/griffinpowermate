@@ -498,6 +498,7 @@ python _test_config.py      # config validation/fallbacks, LED thread survives b
 python _test_paths.py       # config/log location, %LOCALAPPDATA% fallback, logging setup
 python _test_version.py     # EXE file-properties resource, version matches CHANGELOG
 python _test_record.py      # shortcut recording: modifiers, NumLock, Shift+digit -> keyboard names
+python _test_config_reload.py  # config.json edited outside the app -> Tk thread, panels refreshed
 python _smoketest_gui.py    # builds the GUI, exercises profiles/panels/save, tears down
 ```
 
@@ -577,6 +578,7 @@ powermate-app/
 ├── _test_paths.py          # config/log location + logging setup tests
 ├── _test_version.py        # EXE version resource tests
 ├── _test_record.py         # shortcut-recording conversion tests
+├── _test_config_reload.py  # external config edit -> UI refresh tests
 ├── _test_device.py         # USB read/reconnect tests (fake device)
 ├── _test_config.py         # config validation tests
 ├── _smoketest_gui.py       # GUI smoke test
