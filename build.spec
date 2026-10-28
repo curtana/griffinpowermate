@@ -24,6 +24,20 @@ binaries = [(_libusb_dll(), ".")]
 datas = [("assets/icon.ico", "assets")]
 datas += collect_data_files("customtkinter")
 
+# --- EXE file properties (VERSIONINFO) ---
+# Generated from version.py on every build; no hand-kept resource file.
+import importlib.util
+_SPEC_ROOT = os.path.dirname(os.path.abspath(SPEC))
+_vspec = importlib.util.spec_from_file_location(
+    "_pm_version", os.path.join(_SPEC_ROOT, "version.py"))
+_vmod = importlib.util.module_from_spec(_vspec)
+_vspec.loader.exec_module(_vmod)
+_BUILD_INFO_DIR = os.path.join(_SPEC_ROOT, "build", "_build_info")
+os.makedirs(_BUILD_INFO_DIR, exist_ok=True)
+_VERSION_FILE = os.path.join(_BUILD_INFO_DIR, "version_info.txt")
+with open(_VERSION_FILE, "w", encoding="utf-8") as _fp:
+    _fp.write(_vmod.version_info_text())
+
 hiddenimports = [
     "comtypes",
     "pycaw",
@@ -77,4 +91,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon="assets\\icon.ico",
+    version=_VERSION_FILE,
 )
