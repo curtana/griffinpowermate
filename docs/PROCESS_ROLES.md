@@ -80,12 +80,26 @@
              (같은 문제 3회면 즉시 매니저에게 — 예외 없음)
   → 개발자: 검수 통과 확정 뒤 매니저에게 최종 보고
   → 매니저: 승인 → 개발자가 머지 → 이슈 종료
-  → 매니저: (오너의 릴리스 요청 시) 배포관 호출
+  → 매니저: (오너의 릴리스 요청 시) 문서 동기화 PR을 develop에 머지(5-1) → 배포관 호출
   → 배포관: develop→main 병합, 태그·릴리스 → 결과 보고
 ```
 
 매니저가 반드시 개입하는 지점: ① 지시서 발행 ② 최종 머지 승인 ③ 3회 규칙 에스컬레이션 ⑤ 릴리스 게이트.
 반복 작업은 워크플로 `.claude/workflows/dev-verify.js`(`Workflow({ name: 'dev-verify', args: { issue: <번호> } })`)로 돌릴 수 있다 — 구현 → 검수 병렬 → 최대 3회.
+
+### 5-1. 릴리스 전 문서 동기화 (오너 결정 2026-10-28)
+릴리스는 **문서 동기화를 먼저 끝내고** 한다. 태그가 가리키는 커밋에 그 판의 문서가 들어 있어야 한다 — 태그 뒤에 문서를 고치면 그 판의 문서가 틀린 채로 남는다(1.3.0·1.3.1에서 README·QUICKSTART·install.bat이 코드 변경을 따라가지 못했다).
+
+매니저는 배포관을 부르기 전에 지난 릴리스 태그 이후의 변경(`git log --oneline <지난 태그>..develop`, `git diff --stat <지난 태그>..develop`)을 기준으로 아래를 점검하고, 고칠 것을 한 PR로 develop에 머지한다.
+
+- [ ] `version.py`의 `VERSION`·`RELEASE_DATE`를 새 판으로(`_test_version.py`가 CHANGELOG와 대조)
+- [ ] `CHANGELOG.md`: `[Unreleased]` → `[X.Y.Z] — 날짜`, 비교·태그 링크
+- [ ] `README.md`: Changelog 하이라이트, 바뀐 기능·설정·단위의 설명, 테스트 목록, Architecture·Project Layout(새 파일), 설치·빌드 절차
+- [ ] `QUICKSTART.md`: 사용자가 보는 기본 동작·설치 단계·문제 해결이 README와 일치
+- [ ] `install.bat`·`requirements.txt`·`config.example.json`: 안내 문구·버전·기본값이 코드와 일치
+- [ ] 릴리스 노트(CHANGELOG의 그 판 절에서 만든다)
+
+릴리스 노트에 넣지 않은 변경, 문서에 남은 옛 이름(드라이버·함수·파일)은 grep으로 한 번 더 확인한다. 배포관 호출 메시지에는 "문서 동기화 PR #N 머지 완료"를 적는다.
 
 ## 6. 검수 이력 관리
 

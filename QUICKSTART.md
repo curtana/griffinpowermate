@@ -3,7 +3,13 @@
 ## First-Time Setup (5 minutes)
 
 ### 1. Install Python Dependencies
-```bash
+Skip this if you use the prebuilt `PowerMate.exe` from the
+[Releases](https://github.com/curtana/griffinpowermate/releases) page.
+
+Use **Python 3.11 (64-bit)** — the pinned requirements have no wheels for 3.14:
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
@@ -21,7 +27,7 @@ This is a one-time setup required for the PowerMate to work.
 3. Run Zadig (no admin required)
 4. Click **Options** → **List All Devices**
 5. In the dropdown, select **Griffin PowerMate**
-6. Verify the driver name is **libusb-win32** (not libusb)
+6. Choose **WinUSB** as the replacement driver
 7. Click **Replace Driver** and wait for completion
 8. You may see an error — that's normal; the driver was still installed
 
@@ -35,10 +41,11 @@ python main.py
 ```
 
 Or build and run as a standalone EXE:
-```bash
-pyinstaller build.spec
+```powershell
+pip install pyinstaller
+pyinstaller --noconfirm --clean build.spec
 ```
-Then run `dist/PowerMate.exe`
+Then run `dist\PowerMate.exe` (its file properties show the product name and version).
 
 ## What You'll See
 
@@ -51,7 +58,8 @@ Then run `dist/PowerMate.exe`
 ### Rotate the Knob
 - **Rotate clockwise** → increases system volume
 - **Rotate counter-clockwise** → decreases system volume
-- **LED brightness** follows volume, then fades after 1 second
+- **LED** lights at the volume level while the volume changes, then fades after 1 second
+  (it doesn't light for scroll or key actions, and looks dark when muted/near 0 %)
 
 ### Press the Knob
 - **Single click** → mute/unmute
@@ -72,7 +80,8 @@ Then run `dist/PowerMate.exe`
    - **+ Add Profile** to create app-specific bindings
 3. **Bindings** tab: edit trigger → action for each profile
 4. **LED** tab: change LED mode (solid, pulse, flash, volume-track)
-5. **Timing** tab: adjust gesture timing if needed
+5. **Timing** tab: adjust gesture timing, rotation sensitivity, and rotation
+   acceleration (0 = off; higher = fast turns move further)
 6. Click **Save** to persist
 
 ### Editing config.json by Hand
@@ -87,7 +96,7 @@ Then run `dist/PowerMate.exe`
 ### Make PowerMate control video playback in Chrome
 1. Open Settings → click "+ Add Profile" → select `chrome.exe`
 2. In the **Bindings** tab, for the Chrome profile:
-   - `rotate_right`: `scroll_down`, amount=5
+   - `rotate_right`: `scroll_down`, amount=5 (lines; 3 lines = one wheel notch)
    - `rotate_left`: `scroll_up`, amount=5
    - `long_press`: `key`, keys="f5" (refresh)
    - `double_press`: `key`, keys="space" (play/pause)
@@ -125,19 +134,22 @@ Then run `dist/PowerMate.exe`
 ### LED doesn't respond
 1. Check LED mode is not `off` (LED tab)
 2. If in `solid` mode, ensure brightness slider is not at 0
-3. Try switching to `flash` mode to verify the device responds
-4. Some v1 PowerMate devices may not support hardware pulse — the app falls back automatically
+3. In `volume` mode the LED only lights on volume/mute actions — if the focused app's
+   profile maps rotation to scroll, or the system is muted/near 0 %, it stays dark
+4. Try switching to `solid` or `flash` mode to verify the device responds
+   (pulse and flash are done in software on Windows)
 
 ## Tips
 
 - **Pause/Resume**: Right-click the tray icon and click **Pause** to temporarily disable the knob. Click **Resume** to re-enable.
-- **Auto-reload**: Edit `config.json` by hand and save — the app auto-reloads within 1 second (you'll see "Status: Reloaded").
+- **Auto-reload**: Edit `config.json` by hand and save — the app auto-reloads within 1 second (you'll see "Status: Config reloaded"). Invalid values fall back to defaults with a warning in `powermate.log`.
 - **Per-app profiles**: Profiles inherit from `default`, so you only need to override the triggers you customize.
 - **Multiple PowerMates**: The current version supports one PowerMate. Multiple support would require device selection in the GUI (future enhancement).
 
 ## Need Help?
 
-1. Check `powermate.log` in the app directory for error messages
+1. Check `powermate.log` next to the app (or `%LOCALAPPDATA%\PowerMate` if the app
+   folder isn't writable) for error messages
 2. Open Settings and check the status bar for connection state
 3. Run with debug logging:
    ```bash

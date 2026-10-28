@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Documentation
+- Synced the docs with 1.3.0–1.3.1, which had shipped without them: README (1.3.1
+  highlight, full test list, `version.py` in Architecture, Python 3.11 + venv, prebuilt
+  EXE on the Releases page, when the `volume` LED lights), QUICKSTART (WinUSB driver,
+  build command, LED and acceleration notes, status text), `install.bat` (WinUSB; the
+  `>` in the Zadig hint was redirecting output to a file instead of printing it).
+
 ## [1.3.1] — 2026-10-28
 
 ### Added

@@ -100,22 +100,25 @@ detent per packet.
 
 1. Install the **WinUSB** driver on the PowerMate with Zadig — see
    [USB Driver Setup](#usb-driver-setup-zadig). *(One time.)*
-2. Download / copy **`PowerMate.exe`** and double‑click it.
+2. Download **`PowerMate.exe`** from the
+   [Releases](https://github.com/curtana/griffinpowermate/releases) page and double‑click it.
 3. A tray icon appears. Turn the knob — your system volume changes. Right‑click the tray
    icon → **Settings** to customize.
 
 ### Option B — Run from source (developers)
 
 ```powershell
-# 1. Python 3.11+ (64-bit). 3.14 is tested.
-python --version
+# 1. Python 3.11 (64-bit). The pinned requirements (pywin32 306, Pillow 10.2.0,
+#    psutil 5.9.8) have no wheels for 3.14, so use 3.11 in a virtual environment.
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 
 # 2. Install dependencies
 pip install -r requirements.txt
 
 # 3. Install the WinUSB driver via Zadig (see below)
 
-# 4. Run
+# 4. Run (add `debug` for verbose logs)
 python main.py
 ```
 
@@ -258,7 +261,7 @@ Keyboard and media actions use the **keyboard** library; shortcut syntax is
 | `solid` | Constant brightness (set by `brightness`, 0.0–1.0) |
 | `pulse` | Smooth software sine pulse; `pulse_speed` (0–510) sets the period |
 | `flash` | On/off at `flash_on_ms` / `flash_off_ms` |
-| `volume` | Brightness tracks the system volume, then fades after `fade_delay`/`fade_speed` |
+| `volume` | Lights when a `volume_up`/`volume_down`/`mute` action runs, at the current system volume level, then fades after `fade_delay`/`fade_speed`. Other actions (scroll, keys, media) don't light it, and near 0 % volume it looks off |
 
 > On Windows the LED is driven entirely via interrupt‑OUT writes, so **pulse and flash are
 > implemented in software** (the device's hardware‑pulse command uses a control transfer
@@ -404,6 +407,7 @@ actions.py       Action executors (volume, media, scroll, keys, launch, run)
 app_monitor.py   Foreground process detection for per-app profiles
 config.py        Load/save/validate config.json with live file-watch reload
 paths.py         App / data / bundled-resource folders (independent of the CWD)
+version.py       Program version + EXE file-properties (VERSIONINFO) text
 tray.py          System tray icon + menu (pystray)
 ui/              CustomTkinter GUI (app_window, profile_view, action_editor,
                  led_panel, timing_panel)
@@ -481,11 +485,14 @@ verified supply chain.
 
 ## Testing
 
-Three test suites run **without** hardware:
+These test suites run **without** hardware (USB and audio are faked where needed). Run
+them with the venv python:
 
 ```powershell
-python _test_gesture.py     # gesture state machine: all 8 triggers + regressions
-python _test_features.py    # macro action, startup module, debug panel, triple/long bindings
+python _test_gesture.py     # gesture state machine: all 8 triggers, multi-click from release, acceleration
+python _test_features.py    # macro, scroll (wheel delta, no pause), startup module, debug panel
+python _test_device.py      # USB read timeouts vs errors, claim failure, reconnect + backoff, LED race
+python _test_config.py      # config validation/fallbacks, LED thread survives bad values, GUI save
 python _test_paths.py       # config/log location, %LOCALAPPDATA% fallback, logging setup
 python _test_version.py     # EXE file-properties resource, version matches CHANGELOG
 python _smoketest_gui.py    # builds the GUI, exercises profiles/panels/save, tears down
@@ -516,7 +523,9 @@ LED control all confirmed on a real PowerMate over WinUSB.
 
 **LED doesn't light**
 - Make sure the LED mode isn't `off` and (for `solid`) brightness isn't 0.
-- Switch to `flash` briefly to confirm the device responds.
+- In `volume` mode it only lights on volume/mute actions and at the volume level: an app
+  profile that maps rotation to scroll won't light it, and a muted/0 % system looks dark.
+- Switch to `solid` or `flash` briefly to confirm the device responds.
 
 **Keyboard shortcuts don't fire**
 - The target app must have focus. Some apps capture keys differently.
@@ -564,6 +573,8 @@ powermate-app/
 ├── _test_features.py       # macro / startup / debug-panel tests
 ├── _test_paths.py          # config/log location + logging setup tests
 ├── _test_version.py        # EXE version resource tests
+├── _test_device.py         # USB read/reconnect tests (fake device)
+├── _test_config.py         # config validation tests
 ├── _smoketest_gui.py       # GUI smoke test
 ├── README.md
 └── QUICKSTART.md
@@ -575,6 +586,8 @@ powermate-app/
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full version history. Highlights:
 
+- **1.3.1** — `PowerMate.exe` file properties show the product name and version
+  (from `version.py`).
 - **1.3.0** — immediate knob scrolling (direct wheel events, no 0.1 s pause), working
   rotation sensitivity and an optional acceleration curve, reconnect after unplug,
   config/log next to the app (Start with Windows), double/triple press timed from
