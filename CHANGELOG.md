@@ -15,7 +15,8 @@ All notable changes to this project are documented here. The format is based on
 
 ### Fixed
 - Bindings tab: rows for actions without parameters (`press`, `double_press`, …) are no longer 200 px tall, so all rows show at startup (#19). (`ui/action_editor.py`)
-- Quit closes the device only after the worker has stopped and removes the tray icon; a press is read from bit 0 of the report's first byte; the read-error backoff resets when the knob is not found. (`main.py`, `tray.py`)
+- Shortcut recording: NumLock no longer records as `alt`, and Shift+digit/symbol records the base key (`shift+1`, not `shift+exclam`) so `keyboard` can replay it (#18). (`ui/action_editor.py`)
+- Quit closes the device only after the worker has stopped and removes the tray icon; a press is read from bit 0 of the report's first byte; the read-error backoff resets when the knob is not found. (#20) (`main.py`, `tray.py`)
 
 ## [1.3.1] — 2026-10-28
 
