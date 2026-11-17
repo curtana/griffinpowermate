@@ -129,9 +129,19 @@ def test_record_dialog_uses_conversion():
             dialog = [w for w in ed.winfo_children()
                       if w not in before and isinstance(w, ctk.CTkToplevel)]
             assert dialog, "record dialog not opened"
+            # In Windows dark mode CTkToplevel starts withdrawn (to recolour the
+            # title bar) and shows itself ~100 ms later; focus_force() on a
+            # window that is not viewable leaves focus on the root.
+            deadline = time.monotonic() + 2.0
+            while not dialog[0].winfo_viewable():
+                assert time.monotonic() < deadline, "dialog never became visible"
+                root.update(); time.sleep(0.01)
             # Tk routes key events to the focus window; make it the dialog.
             dialog[0].focus_force()
             root.update()
+            focus = root.focus_get()
+            assert focus is not None and str(focus.winfo_toplevel()) == str(dialog[0]), \
+                f"focus not on dialog: {focus}"
             dialog[0].event_generate("<KeyPress>", keysym=keysym, state=state,
                                      keycode=keycode)
             root.update()
