@@ -5,8 +5,8 @@ Bump VERSION and RELEASE_DATE before tagging a release (tag ``v<VERSION>``);
 ``build.spec`` turns them into the Windows VERSIONINFO resource on every build.
 """
 
-VERSION = "1.3.1"
-RELEASE_DATE = "2026-10-28"
+VERSION = "1.3.2"
+RELEASE_DATE = "2026-11-17"
 
 # Shown in Explorer > Properties > Details (Product name / File description).
 PRODUCT_NAME = "Griffin PowerMate Controller"

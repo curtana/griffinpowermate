@@ -592,6 +592,10 @@ powermate-app/
 
 See [`CHANGELOG.md`](CHANGELOG.md) for the full version history. Highlights:
 
+- **1.3.2** — bug fixes: shortcut recording ignores NumLock and records Shift+digit as a
+  replayable key, every Bindings row shows at startup, Quit stops cleanly and removes the
+  tray icon, and `config.json` edited outside the app shows up in the settings window
+  (so Save no longer overwrites it).
 - **1.3.1** — `PowerMate.exe` file properties show the product name and version
   (from `version.py`).
 - **1.3.0** — immediate knob scrolling (direct wheel events, no 0.1 s pause), working

@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.3.2] — 2026-11-17
+
 ### Documentation
 - Synced the docs with 1.3.0–1.3.1, which had shipped without them: README (1.3.1
   highlight, full test list, `version.py` in Architecture, Python 3.11 + venv, prebuilt
@@ -16,7 +18,7 @@ All notable changes to this project are documented here. The format is based on
 ### Fixed
 - Bindings tab: rows for actions without parameters (`press`, `double_press`, …) are no longer 200 px tall, so all rows show at startup (#19). (`ui/action_editor.py`)
 - Shortcut recording: NumLock no longer records as `alt`, and Shift+digit/symbol records the base key (`shift+1`, not `shift+exclam`) so `keyboard` can replay it (#18). (`ui/action_editor.py`)
-- Quit closes the device only after the worker has stopped and removes the tray icon; a press is read from bit 0 of the report's first byte; the read-error backoff resets when the knob is not found. (#20) (`main.py`, `tray.py`)
+- Quit closes the device only after the worker has stopped and removes the tray icon; a press is read from bit 0 of the report's first byte; the read-error backoff resets when the knob is not found, and the wait for an absent knob ends as soon as the app quits. (#20) (`main.py`, `tray.py`)
 - `config.json` edited outside the app is applied on the Tk thread and shown in every settings panel and the profile list, so Save no longer overwrites it with the old screen values (#21). (`main.py`, `ui/app_window.py`)
 
 ## [1.3.1] — 2026-10-28
@@ -182,7 +184,8 @@ All notable changes to this project are documented here. The format is based on
   power cycle. Hardware pulse modes are therefore disabled on Windows; pulse/flash are
   done in software.
 
-[Unreleased]: https://github.com/curtana/griffinpowermate/compare/v1.3.1...develop
+[Unreleased]: https://github.com/curtana/griffinpowermate/compare/v1.3.2...develop
+[1.3.2]: https://github.com/curtana/griffinpowermate/releases/tag/v1.3.2
 [1.3.1]: https://github.com/curtana/griffinpowermate/releases/tag/v1.3.1
 [1.3.0]: https://github.com/curtana/griffinpowermate/releases/tag/v1.3.0
 [1.2.0]: https://github.com/accolytebyte/griffinpowermate/releases/tag/v1.2.0
